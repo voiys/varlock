@@ -91,10 +91,15 @@ export class ConfigItem {
    * fetch ordered list of definitions for this item, by following the sorted definition sources list
    * internal defs (builtins) are appended last (lowest priority)
    */
+  private _defsMemo?: { version: number, internalDefs: number, value: Array<ConfigItemDefAndSource> };
   get defs() {
-    // TODO: this is somewhat inneficient, because some of the checks on the data source follow up the parent chain
-    // we may want to cache the definition list at some point when loading is complete
-    // although we need it to be dynamic during the loading process when doing any early resolution of the envFlag
+    // dynamic while loading (early resolution of the envFlag can run before all sources exist); memoized once items
+    // are processed, keyed on the graph's structure version and on _internalDefs, which only ever grows
+    const graph = this.envGraph;
+    if (graph.configItemsProcessed && this._defsMemo?.version === graph._structureVersion
+      && this._defsMemo.internalDefs === this._internalDefs.length) {
+      return this._defsMemo.value;
+    }
     const defs: Array<ConfigItemDefAndSource> = [];
     for (const { source, filterNode } of this.envGraph.sortedDefinitionSources) {
       if (!source.configItemDefs[this.key]) continue;
@@ -103,6 +108,9 @@ export class ConfigItem {
       defs.push({ itemDef: source.configItemDefs[this.key], source });
     }
     defs.push(...this._internalDefs);
+    if (graph.configItemsProcessed) {
+      this._defsMemo = { version: graph._structureVersion, internalDefs: this._internalDefs.length, value: defs };
+    }
     return defs;
   }
 

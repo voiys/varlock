@@ -347,11 +347,25 @@ export class EnvGraph {
   }
 
 
+  /**
+   * Bumped whenever the source tree changes (a source is added or disabled). The structure getters below
+   * (and ConfigItem.defs) are hit thousands of times per load on large schemas, so once items are processed
+   * they memoize against this version instead of rebuilding the same lists on every access.
+   */
+  _structureVersion = 0;
+  private _sortedDataSourcesMemo?: { version: number, value: Array<EnvGraphDataSource> };
+  private _sortedDefinitionSourcesMemo?: { version: number, value: Array<DefinitionSourceEntry> };
+
   get sortedDataSources() {
+    if (this.configItemsProcessed && this._sortedDataSourcesMemo?.version === this._structureVersion) {
+      return this._sortedDataSourcesMemo.value;
+    }
     function getSourceAndChildren(s: EnvGraphDataSource): Array<EnvGraphDataSource> {
       return [s, ...s.children ? s.children.flatMap(getSourceAndChildren) : []];
     }
-    return this.rootDataSource ? getSourceAndChildren(this.rootDataSource) : [];
+    const value = this.rootDataSource ? getSourceAndChildren(this.rootDataSource) : [];
+    if (this.configItemsProcessed) this._sortedDataSourcesMemo = { version: this._structureVersion, value };
+    return value;
   }
 
   /**
@@ -366,6 +380,9 @@ export class EnvGraph {
    * the original source's full subtree at the alias's precedence position.
    */
   get sortedDefinitionSources(): Array<DefinitionSourceEntry> {
+    if (this.configItemsProcessed && this._sortedDefinitionSourcesMemo?.version === this._structureVersion) {
+      return this._sortedDefinitionSourcesMemo.value;
+    }
     const result: Array<DefinitionSourceEntry> = [];
 
     for (const source of this.sortedDataSources) {
@@ -380,6 +397,9 @@ export class EnvGraph {
       }
     }
 
+    if (this.configItemsProcessed) {
+      this._sortedDefinitionSourcesMemo = { version: this._structureVersion, value: result };
+    }
     return result;
   }
 
@@ -617,6 +637,7 @@ export class EnvGraph {
   async setRootDataSource(source: EnvGraphDataSource) {
     if (this.rootDataSource) throw new Error('root data source already set');
     this.rootDataSource = source;
+    this._structureVersion++;
     source.graph = this;
     await source.finishInit();
     // Process imports on the root source itself.
@@ -914,12 +935,18 @@ export class EnvGraph {
     }
   }
 
+  private _graphAdjacencyListMemo?: { version: number, value: GraphAdjacencyList };
   get graphAdjacencyList() {
+    // item deps are fixed once items are processed, and every caller only reads the result
+    if (this.configItemsProcessed && this._graphAdjacencyListMemo?.version === this._structureVersion) {
+      return this._graphAdjacencyListMemo.value;
+    }
     const adjList: GraphAdjacencyList = {};
     for (const itemKey in this.configSchema) {
       const item = this.configSchema[itemKey];
       adjList[itemKey] = item.dependencyKeys;
     }
+    if (this.configItemsProcessed) this._graphAdjacencyListMemo = { version: this._structureVersion, value: adjList };
     return adjList;
   }
 
@@ -935,7 +962,7 @@ export class EnvGraph {
     const keysToResolve = keys ?? _.keys(this.configSchema);
     if (!keysToResolve.length) return;
 
-    const adjList = _.pick(this.graphAdjacencyList, keysToResolve);
+    const adjList = keys ? _.pick(this.graphAdjacencyList, keysToResolve) : this.graphAdjacencyList;
     const reverseAdjList: Record<string, Array<string>> = {};
     for (const itemKey in adjList) {
       const itemDeps = adjList[itemKey];
@@ -950,18 +977,22 @@ export class EnvGraph {
     // - false = not yet started
     // - items are removed when completed
     const itemsToResolveStatus = _.fromPairs(keysToResolve.map((key) => [key, false]));
+    // counted rather than re-counting the object's keys after every item, which was O(n^2)
+    let itemsRemaining = _.keys(itemsToResolveStatus).length;
 
     // code is a bit awkward here because we are resolving items in parallel
     // and need to continue resolving dependent items as each finishes
 
     const deferred = new Promise<void>((resolve, reject) => {
       const markItemCompleted = (itemKey: string) => {
+        if (!(itemKey in itemsToResolveStatus)) return;
         delete itemsToResolveStatus[itemKey];
+        itemsRemaining--;
         if (reverseAdjList[itemKey]) {
           // eslint-disable-next-line no-use-before-define
           reverseAdjList[itemKey].forEach((depKey) => startResolveItem(depKey));
         }
-        if (_.keys(itemsToResolveStatus).length === 0) resolve();
+        if (itemsRemaining === 0) resolve();
       };
 
       const resolveItem = async (itemKey: string) => {
