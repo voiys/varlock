@@ -132,8 +132,13 @@ export class EnvGraphDataType {
   get isInternal() { return this.def.internal; }
   get docsEntries() { return this.def.docs; }
   get coercedType() { return this.def.coercedType; }
-  /** @internal see `_coerceUnavailable` on the def */
-  get _isCoerceUnavailable() { return !!this.def._coerceUnavailable; }
+  /** @internal see `_coerceUnavailable` on the def. Also true for a composite type (array, record) built from one */
+  get _isCoerceUnavailable(): boolean {
+    if (this.def._coerceUnavailable) return true;
+    const settings = this.usageArgs[0];
+    return _.isPlainObject(settings)
+      && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val._isCoerceUnavailable);
+  }
 
   generatePlaceholder(seed: string) {
     return this.def.generatePlaceholder?.(seed);

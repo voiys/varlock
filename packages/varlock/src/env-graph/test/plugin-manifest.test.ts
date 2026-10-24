@@ -155,24 +155,39 @@ describe('plugin manifests', () => {
   });
 
   test('a value whose type the plugin coerces in code is unknown, and so are values built from it', async () => {
-    const schema = schemaFor(FIXTURE_DIR, 'PORT_COPY=$PORT\nPORT_URL=concat("http://localhost:", $PORT)');
+    const schema = schemaFor(FIXTURE_DIR, outdent`
+      PORT_COPY=$PORT
+      PORT_URL=concat("http://localhost:", $PORT)
+      # @type=array(manifestTestPort)
+      PORTS=8080,9090
+      # @type=record(manifestTestPort)
+      PORT_MAP={"a":8080}
+    `);
     const withoutManifest = copyFixture({ packageJson: (pkg) => delete pkg.exports['./manifest'] });
     const executed = await load(schema.replace(FIXTURE_DIR, withoutManifest), 'shape');
     const fromManifest = await load(schema, 'shape');
     await executed.g.resolveEnvValues();
     await fromManifest.g.resolveEnvValues();
-    const valuesOf = ({ g }: { g: EnvGraph }) => Object.fromEntries(['PORT', 'PORT_COPY', 'PORT_URL'].map((key) => [key, { value: g.configSchema[key].resolvedValue, unknown: g.configSchema[key].isValueUnknownInShapeLoad }]));
+    const keys = ['PORT', 'PORT_COPY', 'PORT_URL', 'PORTS', 'PORT_MAP'];
+    const valuesOf = ({ g }: { g: EnvGraph }) => Object.fromEntries(keys.map((key) => {
+      const item = g.configSchema[key];
+      return [key, { value: item.resolvedValue, unknown: item.isValueUnknownInShapeLoad }];
+    }));
     // control: running the plugin coerces the port to a number
     expect(valuesOf(executed)).toEqual({
       PORT: { value: 8080, unknown: false },
       PORT_COPY: { value: '8080', unknown: false },
       PORT_URL: { value: 'http://localhost:8080', unknown: false },
+      PORTS: { value: [8080, 9090], unknown: false },
+      PORT_MAP: { value: { a: 8080 }, unknown: false },
     });
     // from the manifest it can't, so it is unknown rather than the string "8080"
     expect(valuesOf(fromManifest)).toEqual({
       PORT: { value: undefined, unknown: true },
       PORT_COPY: { value: undefined, unknown: true },
       PORT_URL: { value: undefined, unknown: true },
+      PORTS: { value: undefined, unknown: true },
+      PORT_MAP: { value: undefined, unknown: true },
     });
     expect(fromManifest.g.shapeSkipped).toContainEqual({ kind: 'coerce', name: 'manifestTestPort', itemKey: 'PORT' });
     // a type the plugin does not coerce keeps its value
@@ -213,7 +228,9 @@ describe('plugin manifests', () => {
 
   test('the committed fixture manifest is what generatePluginManifest produces', async () => {
     const committed = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, 'plugin-manifest.json'), 'utf-8'));
-    expect(await generatePluginManifest(FIXTURE_DIR)).toEqual(committed);
+    expect(await generatePluginManifest(FIXTURE_DIR)).toEqual({
+      manifest: committed, manifestPath: path.join(FIXTURE_DIR, 'plugin-manifest.json'),
+    });
   });
 
   test('generatePluginManifest refuses plugins it cannot describe', async () => {
@@ -223,11 +240,21 @@ describe('plugin manifests', () => {
 
     const dir = path.join(tmpDir, 'with-regexp');
     fs.mkdirSync(dir);
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'with-regexp', exports: { './plugin': './plugin.js' } }));
+    const exports = { './plugin': './plugin.js', './manifest': './plugin-manifest.json' };
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'with-regexp', exports }));
     fs.writeFileSync(path.join(dir, 'plugin.js'), outdent`
       const { plugin } = require('varlock/plugin-lib');
       plugin.registerResolverFunction({ name: 'rx', inferredTypeSettings: { matches: /x/ }, resolve: () => 'x' });
     `);
     await expect(generatePluginManifest(dir)).rejects.toThrow(/resolver "rx": unsupported value for "inferredTypeSettings"/);
+
+    const noExport = copyFixture({ packageJson: (pkg) => delete pkg.exports['./manifest'] });
+    await expect(generatePluginManifest(noExport)).rejects.toThrow(/has no "\.\/manifest" export/);
+    const outside = copyFixture({
+      packageJson: (pkg) => {
+        pkg.exports['./manifest'] = '../outside.json';
+      },
+    });
+    await expect(generatePluginManifest(outside)).rejects.toThrow(/outside its package/);
   });
 });

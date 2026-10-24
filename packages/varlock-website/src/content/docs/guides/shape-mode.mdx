@@ -59,7 +59,7 @@ This loads the schema file and the files it imports. Value files such as `.env.l
 
 Everything skipped is recorded in `graph.shapeSkipped` as `{ kind, name, itemKey? }`, where `kind` is `resolver`, `rootDecoratorExecute`, `cacheStore`, `pluginDownload`, `codegenWrite`, or `coerce` (see [Plugin manifests](#plugin-manifests)), and `itemKey` is the item whose value was being resolved when a resolver or coercion was skipped. Tools can use it to tell users which values could not be computed.
 
-Apart from those differences, a tool sees the same types that [code generation](/guides/code-generation/) produces, and the same requiredness, sensitivity, and validation messages, except where a decorator or function depends on a value that was skipped (see [Pure resolvers](#pure-resolvers)). [Builtin variables](/reference/builtin-variables/) such as `VARLOCK_ENV` are computed from an env you pass in explicitly, or from an empty one, so the same schema gives the same result on any machine. Without CI variables in that env, `VARLOCK_BRANCH` is unknown (and listed in `shapeSkipped`), because the local `git branch --show-current` lookup is skipped.
+Apart from those differences, a tool sees the same types that [code generation](/guides/code-generation/) produces, and the same requiredness, sensitivity, and validation messages, except where a decorator or function depends on a value that was skipped (see [Pure resolvers](#pure-resolvers)), and except for the checks a plugin read from its [manifest](#plugin-manifests) does in code (its `process()` hooks and data type `validate()`), which don't run and are not listed in `shapeSkipped`. [Builtin variables](/reference/builtin-variables/) such as `VARLOCK_ENV` are computed from an env you pass in explicitly, or from an empty one, so the same schema gives the same result on any machine. Without CI variables in that env, `VARLOCK_BRANCH` is unknown (and listed in `shapeSkipped`), because the local `git branch --show-current` lookup is skipped.
 
 ### Pure resolvers
 
@@ -108,7 +108,7 @@ A manifest only holds data. Nothing a plugin does in code is carried, so with a 
 
 - the plugin's `process()` hooks, so checks such as a duplicate `@initOp` id or an `op()` call naming an unknown instance are not reported, and anything a hook sets (for example a resolver's inferred type set in `process()` rather than on its definition) is missing
 - data type `validate()`, so a check such as "token must start with `ops_`" is not reported
-- data type `coerce()`. The value of an item whose type the plugin coerces in code is unknown, like a value from a skipped resolver, and is listed in `graph.shapeSkipped` with `kind: 'coerce'`
+- data type `coerce()`. The value of an item whose type the plugin coerces in code (directly, or as the element of a type such as `array(myType)`) is unknown, like a value from a skipped resolver, and is listed in `graph.shapeSkipped` with `kind: 'coerce'`
 - any resolver, including one marked `pure: true`, so its items are unknown and listed in `graph.shapeSkipped`
 
 A data type that takes settings, like `myType(max=10)`, is described as it is with no settings, so settings that change its coerced type, sensitivity, or other metadata are not reflected.
@@ -133,8 +133,9 @@ Generate the file from the built plugin rather than writing it by hand. `generat
 import fs from 'node:fs';
 import { internal } from 'varlock';
 
-const manifest = await internal.generatePluginManifest('.');
-fs.writeFileSync('plugin-manifest.json', `${JSON.stringify(manifest, null, 2)}\n`);
+// manifestPath is where the package's "./manifest" export points
+const { manifest, manifestPath } = await internal.generatePluginManifest('.');
+fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 ```
 
 Run it after each build, or check it in CI, so the manifest never falls behind the plugin. The varlock repo does this for its own plugins with `bun run plugin-manifests` and `bun run plugin-manifests --check`.

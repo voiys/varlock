@@ -24,16 +24,15 @@ const args = process.argv.slice(2);
 const checkOnly = args.includes('--check');
 const explicitDirs = args.filter((a) => !a.startsWith('--')).map((d) => path.resolve(d));
 
-function readManifestExport(pluginDir: string): string | undefined {
+function hasManifestExport(pluginDir: string): boolean {
   const pkgJson = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf-8'));
-  const manifestExport = pkgJson.exports?.['./manifest'];
-  return typeof manifestExport === 'string' ? path.join(pluginDir, manifestExport) : undefined;
+  return pkgJson.exports?.['./manifest'] !== undefined;
 }
 
 const pluginDirs = explicitDirs.length
   ? explicitDirs
   : fs.readdirSync(PLUGINS_DIR).sort().map((d) => path.join(PLUGINS_DIR, d))
-    .filter((d) => fs.existsSync(path.join(d, 'package.json')) && readManifestExport(d));
+    .filter((d) => fs.existsSync(path.join(d, 'package.json')) && hasManifestExport(d));
 
 if (!fs.existsSync(VARLOCK_DIST)) {
   console.error('varlock is not built: run `bun run build:libs` first');
@@ -44,14 +43,13 @@ const { internal } = await import(pathToFileURL(VARLOCK_DIST).href);
 const problems: Array<string> = [];
 for (const pluginDir of pluginDirs) {
   const relDir = path.relative(MONOREPO_ROOT, pluginDir);
-  const manifestPath = readManifestExport(pluginDir);
-  if (!manifestPath) {
-    problems.push(`${relDir}: package.json has no "./manifest" export`);
-    continue;
-  }
   let contents: string;
+  let manifestPath: string;
   try {
-    contents = `${JSON.stringify(await internal.generatePluginManifest(pluginDir), null, 2)}\n`;
+    // resolves the "./manifest" export the same way varlock does when loading it
+    const generated = await internal.generatePluginManifest(pluginDir);
+    contents = `${JSON.stringify(generated.manifest, null, 2)}\n`;
+    manifestPath = generated.manifestPath;
   } catch (err) {
     problems.push(`${relDir}: ${(err as Error).message}`);
     continue;

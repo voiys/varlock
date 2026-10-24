@@ -980,16 +980,18 @@ export async function processPluginInstallDecorators(dataSource: EnvGraphDataSou
 }
 
 /**
- * Runs a package plugin and returns the manifest describing what it registers, for the plugin to
- * ship as its `./manifest` export. This executes the plugin, so only use it on plugins you trust
- * (e.g. your own, at build time).
+ * Runs a package plugin and returns the manifest describing what it registers, along with the path
+ * its `./manifest` export points at, where the plugin should ship it. This executes the plugin, so
+ * only use it on plugins you trust (e.g. your own, at build time).
  */
-export async function generatePluginManifest(pluginPackageDir: string): Promise<PluginManifest> {
+export async function generatePluginManifest(pluginPackageDir: string) {
   const plugin = await initPluginFromLocalPath(path.resolve(pluginPackageDir));
   if (plugin.type !== 'package') throw new Error('Only plugin packages can ship a manifest');
+  const manifestPath = plugin.manifestFilePath;
+  if (!manifestPath) throw new Error(`Plugin ${plugin.name} has no "./manifest" export in its package.json`);
   await plugin.executePluginModule();
   if (plugin.loadingError) throw plugin.loadingError;
-  return createPluginManifest(plugin);
+  return { manifest: createPluginManifest(plugin), manifestPath };
 }
 
 export type VarlockPluginCtx = {
