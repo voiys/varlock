@@ -14,3 +14,13 @@ export function parseRegexLikeString(str: string): RegExp | null {
     return null;
   }
 }
+
+/**
+ * Reads a `matches` setting: a RegExp as is, a `/pattern/flags` string as a regex, and any other
+ * string (including a regex-like one that does not compile) as a bare pattern. Throws if that
+ * pattern is not a valid regex either.
+ */
+export function matchesSettingToRegExp(matches: string | RegExp): RegExp {
+  if (typeof matches !== 'string') return matches;
+  return parseRegexLikeString(matches) ?? new RegExp(matches);
+}

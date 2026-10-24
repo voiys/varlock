@@ -1,7 +1,7 @@
 import _ from '@env-spec/utils/my-dash';
 import { type FallbackIfUnknown } from '@env-spec/utils/type-utils';
 import { CoercionError, ValidationError, type ErrorSeverity } from './errors';
-import { parseRegexLikeString } from './regex-like-string';
+import { matchesSettingToRegExp } from './regex-like-string';
 import { checkValidationRules, type ValidationRule } from './validation-rules';
 import {
   parseDuration, convertDurationFromMs, type DurationUnit,
@@ -147,12 +147,16 @@ export class EnvGraphDataType {
   get isInternal() { return this.def.internal; }
   get docsEntries() { return this.def.docs; }
   get coercedType() { return this.def.coercedType; }
-  /** @internal see `coerceUnavailable` on the def. Also true for a composite type (array, record) built from one */
-  get coerceUnavailable(): boolean {
-    if (this.def.coerceUnavailable) return true;
+  /** true if `pred` holds for this type's def or, for a composite type (array, record), a type it is built from */
+  private someComponentType(pred: (def: EnvGraphDataTypeDef<any, any>) => boolean): boolean {
+    if (pred(this.def)) return true;
     const settings = this.usageArgs[0];
     return _.isPlainObject(settings)
-      && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val.coerceUnavailable);
+      && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val.someComponentType(pred));
+  }
+  /** @internal see `coerceUnavailable` on the def. Also true for a composite type built from one */
+  get coerceUnavailable(): boolean {
+    return this.someComponentType((def) => !!def.coerceUnavailable);
   }
   /**
    * @internal true when validation ends in a check that only plugin code makes (a `custom` rule) and
@@ -160,10 +164,7 @@ export class EnvGraphDataType {
    * type built from one.
    */
   get _isValidationIncomplete(): boolean {
-    if (!this.def.validate && this.def.validationRules?.some((rule) => 'custom' in rule)) return true;
-    const settings = this.usageArgs[0];
-    return _.isPlainObject(settings)
-      && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val._isValidationIncomplete);
+    return this.someComponentType((def) => !def.validate && !!def.validationRules?.some((rule) => 'custom' in rule));
   }
 
   generatePlaceholder(seed: string) {
@@ -329,12 +330,7 @@ const StringDataType = createEnvGraphDataType(
       }
 
       if (settings?.matches) {
-        let regex: RegExp;
-        if (_.isString(settings.matches)) {
-          regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
-        } else {
-          regex = settings.matches;
-        }
+        const regex = matchesSettingToRegExp(settings.matches);
         const matches = val.match(regex);
         if (!matches) {
           errors.push(new ValidationError(`Value must match regex "${settings.matches}"`));
@@ -710,12 +706,7 @@ const UrlDataType = createEnvGraphDataType(
         errors.push(new ValidationError('URL must not have a trailing slash'));
       }
       if (settings?.matches) {
-        let regex: RegExp;
-        if (_.isString(settings.matches)) {
-          regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
-        } else {
-          regex = settings.matches;
-        }
+        const regex = matchesSettingToRegExp(settings.matches);
         if (!regex.test(val)) {
           errors.push(new ValidationError(`URL must match regex "${settings.matches}"`));
         }
@@ -822,12 +813,7 @@ const DomainDataType = createEnvGraphDataType(
       }
 
       if (settings?.matches) {
-        let regex: RegExp;
-        if (_.isString(settings.matches)) {
-          regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
-        } else {
-          regex = settings.matches;
-        }
+        const regex = matchesSettingToRegExp(settings.matches);
         if (!regex.test(val)) {
           throw new ValidationError(`Domain must match regex "${settings.matches}"`);
         }

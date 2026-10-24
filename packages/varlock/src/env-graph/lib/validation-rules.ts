@@ -1,5 +1,5 @@
 import { ValidationError } from './errors';
-import { REGEX_LIKE_STRING, parseRegexLikeString } from './regex-like-string';
+import { matchesSettingToRegExp } from './regex-like-string';
 
 /**
  * Declarative validation for a data type, so a tool that does not run plugin code (shape mode
@@ -34,48 +34,36 @@ export type ValidationRule = | (ValidationRuleCheck & { message: string, tip?: s
 const isNonEmptyString = (val: unknown) => typeof val === 'string' && val.length > 0;
 const isLength = (val: unknown) => Number.isInteger(val) && (val as number) >= 0;
 
-/**
- * Compiles a `matches` pattern. Unlike `string(matches=...)`, a `/pattern/flags` string that is not
- * a valid regex is an error here rather than a literal pattern, so a typo can't silently match.
- */
-function compilePattern(pattern: string): RegExp {
-  if (REGEX_LIKE_STRING.test(pattern)) {
-    const regex = parseRegexLikeString(pattern);
-    if (!regex) throw new Error(`invalid regex ${pattern}`);
-    return regex;
-  }
-  return new RegExp(pattern);
-}
-const compiledPatterns = new Map<string, RegExp>();
-function getPattern(pattern: string): RegExp {
-  let regex = compiledPatterns.get(pattern);
-  if (!regex) {
-    regex = compilePattern(pattern);
-    compiledPatterns.set(pattern, regex);
-  }
-  // a `g` or `y` flag would make test() stateful
-  regex.lastIndex = 0;
-  return regex;
-}
-
-const CHECKS: Record<string, { isArg: (val: unknown) => boolean, passes: (val: string, arg: any) => boolean }> = {
-  startsWith: { isArg: isNonEmptyString, passes: (val, arg: string) => val.startsWith(arg) },
-  endsWith: { isArg: isNonEmptyString, passes: (val, arg: string) => val.endsWith(arg) },
-  includes: { isArg: isNonEmptyString, passes: (val, arg: string) => val.includes(arg) },
-  minLength: { isArg: isLength, passes: (val, arg: number) => val.length >= arg },
-  maxLength: { isArg: isLength, passes: (val, arg: number) => val.length <= arg },
-  isLength: { isArg: isLength, passes: (val, arg: number) => val.length === arg },
+type Check = {
+  isArg: (val: unknown) => boolean,
+  /** returns the test for a value, given the rule's (valid) arg */
+  prepare: (arg: any) => (val: string) => boolean,
+};
+const CHECKS: Record<string, Check> = {
+  startsWith: { isArg: isNonEmptyString, prepare: (arg: string) => (val) => val.startsWith(arg) },
+  endsWith: { isArg: isNonEmptyString, prepare: (arg: string) => (val) => val.endsWith(arg) },
+  includes: { isArg: isNonEmptyString, prepare: (arg: string) => (val) => val.includes(arg) },
+  minLength: { isArg: isLength, prepare: (arg: number) => (val) => val.length >= arg },
+  maxLength: { isArg: isLength, prepare: (arg: number) => (val) => val.length <= arg },
+  isLength: { isArg: isLength, prepare: (arg: number) => (val) => val.length === arg },
   matches: {
     isArg: (val) => {
       if (typeof val !== 'string' || !val) return false;
       try {
-        compilePattern(val);
+        matchesSettingToRegExp(val);
         return true;
       } catch {
         return false;
       }
     },
-    passes: (val, arg: string) => getPattern(arg).test(val),
+    prepare: (arg: string) => {
+      const regex = matchesSettingToRegExp(arg);
+      return (val) => {
+        // a `g` or `y` flag would make test() stateful
+        regex.lastIndex = 0;
+        return regex.test(val);
+      };
+    },
   },
 };
 export const VALIDATION_RULE_CHECKS = Object.keys(CHECKS);
@@ -83,6 +71,22 @@ export const VALIDATION_RULE_CHECKS = Object.keys(CHECKS);
 /** the name of the check a rule makes (`startsWith`, ...), or `custom` */
 export function validationRuleCheckName(rule: ValidationRule): string {
   return Object.keys(rule).find((key) => key === 'custom' || key in CHECKS)!;
+}
+
+type PreparedRule = { rule: ValidationRule, test?: (val: string) => boolean };
+/** each rule with the test it makes (none for a custom rule), worked out once per list of rules */
+const preparedRules = new WeakMap<Array<ValidationRule>, Array<PreparedRule>>();
+function prepareRules(rules: Array<ValidationRule>) {
+  let prepared = preparedRules.get(rules);
+  if (!prepared) {
+    prepared = rules.map((rule) => {
+      const check = validationRuleCheckName(rule);
+      if (check === 'custom') return { rule };
+      return { rule, test: CHECKS[check].prepare(rule[check as keyof typeof rule]) };
+    });
+    preparedRules.set(rules, prepared);
+  }
+  return prepared;
 }
 
 /** Returns a description of what is wrong with a list of rules, or undefined if it is fine */
@@ -121,10 +125,9 @@ export type ValidationRulesResult = | { passed: true }
 /** Checks a value against rules, stopping at the first failure. Rules only describe string values. */
 export function checkValidationRules(val: unknown, rules: Array<ValidationRule>): ValidationRulesResult {
   if (typeof val !== 'string') return { passed: 'unknown', rule: rules[0] };
-  for (const [index, rule] of rules.entries()) {
-    if ('custom' in rule) return { passed: 'unknown', rule };
-    const check = validationRuleCheckName(rule);
-    if (!CHECKS[check].passes(val, rule[check as keyof typeof rule])) {
+  for (const [index, { rule, test }] of prepareRules(rules).entries()) {
+    if ('custom' in rule || !test) return { passed: 'unknown', rule };
+    if (!test(val)) {
       return {
         passed: false,
         rule,

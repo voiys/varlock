@@ -149,8 +149,13 @@ const isStandardVars = (val: unknown) => _.isPlainObject(val)
     && (_.isString(p.key) || (isStringArray(p.key) && (p.key as Array<string>).length > 0))
     && (p.dataType === undefined || _.isString(p.dataType)));
 
+/** the defs of a plugin's data types. A data type that takes settings is a function of them: describe it with no settings */
+export function pluginDataTypeDefs(plugin: VarlockPlugin) {
+  return (plugin.dataTypes ?? []).map((d) => (typeof d === 'function' ? d() : d));
+}
+
 /** builds the manifest for a plugin whose module has already been executed */
-export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
+export function createPluginManifest(plugin: VarlockPlugin, dataTypeDefs = pluginDataTypeDefs(plugin)): PluginManifest {
   for (const schemeDef of plugin.proxyTransformSchemes ?? []) {
     // the option specs are data, but these hooks are code that changes what a config means or allows
     if (schemeDef.validate || schemeDef.placeAttachedItem) {
@@ -171,9 +176,7 @@ export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
   );
   manifest.rootDecorators = pick(plugin.rootDecorators, DECORATOR_FIELDS, 'root decorator');
   manifest.itemDecorators = pick(plugin.itemDecorators, DECORATOR_FIELDS, 'item decorator');
-  // a data type that takes settings is a function of them: describe it with no settings
-  const dataTypeDefs = plugin.dataTypes?.map((d) => (typeof d === 'function' ? d() : d));
-  for (const def of dataTypeDefs ?? []) {
+  for (const def of dataTypeDefs) {
     if (typeof def.validate === 'function' && !def.validationRules) {
       throw new Error(`Data type "${def.name}" has validate() but no validationRules. Describe its checks as rules (a { custom } rule stands for a check that only runs in code)`);
     }
@@ -182,7 +185,7 @@ export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
     }
   }
   manifest.dataTypes = pick(dataTypeDefs, DATA_TYPE_FIELDS, 'data type').map((entry, i) => (
-    typeof dataTypeDefs![i].coerce === 'function' ? { ...entry, coerceUnavailable: true } : entry
+    typeof dataTypeDefs[i].coerce === 'function' ? { ...entry, coerceUnavailable: true } : entry
   ));
   manifest.resolvers = pick(plugin.resolverFunctions, RESOLVER_FIELDS, 'resolver');
   manifest.codeGenerators = pick(plugin.codeGenerators, CODE_GENERATOR_FIELDS, 'code generator', 'decoratorName');

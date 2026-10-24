@@ -1,9 +1,8 @@
 import { type Resolver, plugin } from 'varlock/plugin-lib';
 import { BUNDLED_ICONS } from './bundled-icons.gen';
 import { DashlaneManager } from './dashlane-manager';
-import { validateDeviceKeys } from './validators';
 
-const { SchemaError, ResolutionError, ValidationError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 
 const DASHLANE_ICON = 'simple-icons:dashlane';
 
@@ -96,11 +95,6 @@ plugin.registerDataType({
     { startsWith: 'dls_', message: 'Service device keys must start with "dls_"' },
     { minLength: 10, message: 'Service device keys appear too short' },
   ],
-  validationSamples: ['dls_abcdefghij', 'dls_abc', 'abcdefghijkl'],
-  async validate(val) {
-    const error = validateDeviceKeys(val);
-    if (error) throw new ValidationError(error);
-  },
 });
 
 // Anonymous, non-sensitive usage signals. Strictly sanitized before send.

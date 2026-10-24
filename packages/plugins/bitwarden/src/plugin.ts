@@ -14,7 +14,7 @@ import {
 
 const { subtle } = webcrypto;
 
-const { ValidationError, SchemaError, ResolutionError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 
 const BITWARDEN_ICON = 'simple-icons:bitwarden';
 
@@ -421,25 +421,6 @@ plugin.registerDataType({
       message: 'Access token must be in format: 0.<client_id>.<client_secret>:<encryption_key>',
     },
   ],
-  validationSamples: [
-    '0.client-id.client-secret:encryption-key',
-    '0..:',
-    '1.client-id.client-secret:encryption-key',
-    '0.client-id.client-secret',
-    '0.client-id.client.secret:key',
-    '0.client-id:x.client-secret',
-    '00.client-id.client-secret:key',
-  ],
-  async validate(val) {
-    // Validate format: 0.<client_id>.<client_secret>:<encryption_key>
-    const parts = val.split('.');
-    if (parts.length !== 3 || parts[0] !== '0') {
-      throw new ValidationError('Access token must be in format: 0.<client_id>.<client_secret>:<encryption_key>');
-    }
-    if (!parts[2].includes(':')) {
-      throw new ValidationError('Access token must be in format: 0.<client_id>.<client_secret>:<encryption_key>');
-    }
-  },
 });
 
 plugin.registerDataType({
@@ -453,13 +434,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ matches: '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', message: 'Secret ID must be a valid UUID' }],
-  validationSamples: ['12345678-1234-1234-1234-123456789012', 'my-secret'],
-  async validate(val) {
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidPattern.test(val)) {
-      throw new ValidationError('Secret ID must be a valid UUID');
-    }
-  },
 });
 
 plugin.registerDataType({
@@ -473,13 +447,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ matches: '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', message: 'Organization ID must be a valid UUID' }],
-  validationSamples: ['12345678-1234-1234-1234-123456789012', 'my-org'],
-  async validate(val) {
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidPattern.test(val)) {
-      throw new ValidationError('Organization ID must be a valid UUID');
-    }
-  },
 });
 
 plugin.registerResolverFunction({
@@ -886,11 +853,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ minLength: 1, message: 'Bitwarden session token must be a non-empty string' }],
-  async validate(val) {
-    if (typeof val !== 'string' || val.length === 0) {
-      throw new ValidationError('Bitwarden session token must be a non-empty string');
-    }
-  },
 });
 
 plugin.registerResolverFunction({

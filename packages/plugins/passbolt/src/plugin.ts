@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { PassboltClient, type UUIDv4String } from './passbolt';
 import type { Resource } from './types';
 
-const { ValidationError, SchemaError, ResolutionError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 
 const PASSBOLT_ICON = 'simple-icons:passbolt';
 
@@ -305,13 +305,6 @@ plugin.registerDataType({
       message: 'Must be a valid Passbolt account kit',
     },
   ],
-  validationSamples: ['eyJkb21haW4iOiJ4In0=', 'YWJjZA==', 'not base64!', 'YWJjZA='],
-  async validate(val: any): Promise<true> {
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(val)) {
-      throw new ValidationError('Must be a valid Passbolt account kit');
-    }
-    return true;
-  },
 });
 
 plugin.registerResolverFunction({

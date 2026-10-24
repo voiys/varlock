@@ -2,7 +2,7 @@ import { type Resolver, plugin } from 'varlock/plugin-lib';
 import { BUNDLED_ICONS } from './bundled-icons.gen';
 import { ExecError, spawnAsync } from '@env-spec/utils/exec-helpers';
 
-const { ValidationError, SchemaError, ResolutionError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 
 const PROTON_PASS_ICON = 'simple-icons:proton';
 
@@ -424,25 +424,6 @@ plugin.registerDataType({
       message: 'Secret reference must be in format `pass://<vault>/<item>/<field>` (exactly 3 components)',
     },
   ],
-  validationSamples: [
-    'pass://vault/item/field',
-    'pass:// vault / item / field ',
-    'vault/item/field',
-    'pass://vault/item',
-    'pass://vault/ /field',
-    'pass://vault/item/field/extra',
-    'pass:///item/field',
-  ],
-  async validate(val) {
-    if (typeof val !== 'string') throw new ValidationError('Secret reference must be a string');
-    if (!val.startsWith('pass://')) throw new ValidationError('Secret reference must start with `pass://`');
-
-    const remainder = val.substring('pass://'.length);
-    const parts = remainder.split('/');
-    if (parts.length !== 3 || parts.some((p) => !p.trim())) {
-      throw new ValidationError('Secret reference must be in format `pass://<vault>/<item>/<field>` (exactly 3 components)');
-    }
-  },
 });
 
 plugin.registerDataType({
@@ -457,10 +438,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ minLength: 1, message: 'Password must be a non-empty string' }],
-  async validate(val): Promise<true> {
-    if (!val || typeof val !== 'string') throw new ValidationError('Password must be a non-empty string');
-    return true;
-  },
 });
 
 plugin.registerDataType({
@@ -473,12 +450,6 @@ plugin.registerDataType({
     // the same check as testing the trimmed value against /^[0-9]{6,8}$/
     { matches: '/^\\s*[0-9]{6,8}\\s*$/', message: 'TOTP should be 6-8 digits' },
   ],
-  validationSamples: ['123456', ' 1234567 ', '12345678', '12345', '123456789', 'abcdef'],
-  async validate(val): Promise<true> {
-    if (!val || typeof val !== 'string') throw new ValidationError('TOTP must be a non-empty string');
-    if (!/^[0-9]{6,8}$/.test(val.trim())) throw new ValidationError('TOTP should be 6-8 digits');
-    return true;
-  },
 });
 
 plugin.registerDataType({
@@ -487,10 +458,6 @@ plugin.registerDataType({
   internal: true,
   typeDescription: 'Proton Pass extra password used by `pass-cli login --interactive` (if required by your account)',
   validationRules: [{ minLength: 1, message: 'Extra password must be a non-empty string' }],
-  async validate(val): Promise<true> {
-    if (!val || typeof val !== 'string') throw new ValidationError('Extra password must be a non-empty string');
-    return true;
-  },
 });
 
 plugin.registerDataType({
@@ -508,15 +475,6 @@ plugin.registerDataType({
     { minLength: 1, message: 'Personal access token must be a non-empty string' },
     { includes: '::', message: 'Personal access token looks malformed - expected `pst_...::TOKENKEY`' },
   ],
-  validationSamples: ['pst_abc123::TOKENKEY', 'pst_abc123:TOKENKEY'],
-  async validate(val): Promise<true> {
-    if (!val || typeof val !== 'string') throw new ValidationError('Personal access token must be a non-empty string');
-    // Tokens are issued in the shape `pst_xxxx...xxxx::TOKENKEY`.
-    if (!val.includes('::')) {
-      throw new ValidationError('Personal access token looks malformed - expected `pst_...::TOKENKEY`');
-    }
-    return true;
-  },
 });
 
 plugin.registerRootDecorator({

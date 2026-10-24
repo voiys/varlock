@@ -18,7 +18,7 @@ import { STSClient, AssumeRoleWithWebIdentityCommand } from '@aws-sdk/client-sts
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { getOidcToken } from '@env-spec/utils/oidc-tokens';
 
-const { ValidationError, SchemaError, ResolutionError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 
 const AWS_ICON = 'simple-icons:amazonwebservices';
 
@@ -599,14 +599,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ matches: '/^[A-Z0-9]{20}$/', message: 'Must be a 20-character alphanumeric string (typically starts with AKIA)' }],
-  validationSamples: ['AKIAIOSFODNN7EXAMPLE', 'akiaiosfodnn7example', 'AKIAIOSFODNN7EXAMPLE1', 'AKIA123'],
-  async validate(val): Promise<true> {
-    // AWS access keys are typically 20 characters and alphanumeric
-    if (!/^[A-Z0-9]{20}$/.test(val)) {
-      throw new ValidationError('Must be a 20-character alphanumeric string (typically starts with AKIA)');
-    }
-    return true;
-  },
 });
 
 plugin.registerDataType({
@@ -620,14 +612,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ isLength: 40, message: 'Must be exactly 40 characters long' }],
-  validationSamples: ['wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', 'wJalrXUtnFEMI/K7MDENG'],
-  async validate(val): Promise<true> {
-    // AWS secret keys are typically 40 characters
-    if (val.length !== 40) {
-      throw new ValidationError('Must be exactly 40 characters long');
-    }
-    return true;
-  },
 });
 
 plugin.registerResolverFunction({

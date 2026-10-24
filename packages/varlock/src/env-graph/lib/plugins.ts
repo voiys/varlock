@@ -40,7 +40,8 @@ import type {
 import { createEnvGraphDataType } from './data-types';
 import type { CodeGeneratorDef } from './type-generation';
 import {
-  applyPluginManifest, checkDataTypeValidationRules, createPluginManifest, parsePluginManifest, type PluginManifest,
+  applyPluginManifest, checkDataTypeValidationRules, createPluginManifest, parsePluginManifest, pluginDataTypeDefs,
+  type PluginManifest,
 } from './plugin-manifest';
 
 import { createDebug, type Debugger } from '../../lib/debug';
@@ -990,12 +991,11 @@ export async function generatePluginManifest(pluginPackageDir: string) {
   if (!manifestPath) throw new Error(`Plugin ${plugin.name} has no "./manifest" export in its package.json`);
   await plugin.executePluginModule();
   if (plugin.loadingError) throw plugin.loadingError;
-  const manifest = createPluginManifest(plugin);
+  const dataTypeDefs = pluginDataTypeDefs(plugin);
+  const manifest = createPluginManifest(plugin, dataTypeDefs);
   // the rules a manifest carries must say what the plugin's validate() says
   const problems: Array<string> = [];
-  for (const dataType of plugin.dataTypes ?? []) {
-    problems.push(...await checkDataTypeValidationRules(_.isFunction(dataType) ? dataType() : dataType));
-  }
+  for (const def of dataTypeDefs) problems.push(...await checkDataTypeValidationRules(def));
   if (problems.length) {
     throw new Error(`Plugin ${plugin.name} has validationRules that do not match its validate():\n${problems.map((p) => `  - ${p}`).join('\n')}`);
   }

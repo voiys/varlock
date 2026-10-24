@@ -14,7 +14,7 @@ import {
   opCliEnvironmentRead, processOpCliError, pickProxyEnv,
 } from './cli-helper';
 
-const { ValidationError, SchemaError, ResolutionError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 const { debug } = plugin;
 
 const PLUGIN_VERSION = plugin.version;
@@ -936,12 +936,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ startsWith: 'ops_', message: 'Service account tokens must start with ops_' }],
-  validationSamples: ['ops_eyJzaWduSW5BZGRyZXNzIjoi', 'eyJzaWduSW5BZGRyZXNzIjoi'],
-  async validate(val) {
-    if (!val.startsWith('ops_')) {
-      throw new ValidationError('Service account tokens must start with ops_');
-    }
-  },
 });
 
 plugin.registerDataType({

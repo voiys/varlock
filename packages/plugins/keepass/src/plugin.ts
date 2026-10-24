@@ -4,7 +4,7 @@ import { BUNDLED_ICONS } from './bundled-icons.gen';
 import { KdbxReader, sanitizeEnvKey } from './kdbx-reader';
 import { KpCliReader } from './cli-helper';
 
-const { ValidationError, SchemaError, ResolutionError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 
 const KP_ICON = 'simple-icons:keepassxc';
 
@@ -226,11 +226,6 @@ plugin.registerDataType({
     },
   ],
   validationRules: [{ minLength: 1, message: 'KeePass database password must be a non-empty string' }],
-  async validate(val) {
-    if (typeof val !== 'string' || val.length === 0) {
-      throw new ValidationError('KeePass database password must be a non-empty string');
-    }
-  },
 });
 
 

@@ -10,6 +10,8 @@ import {
 } from '../index';
 import { generatePluginManifest } from '../lib/plugins';
 import { checkDataTypeValidationRules } from '../lib/plugin-manifest';
+import { checkValidationRules, findValidationRulesProblem } from '../lib/validation-rules';
+import { BaseDataTypes } from '../lib/data-types';
 import { ValidationError } from '../lib/errors';
 
 // The fixture plugin counts its own module executions in this global, so every test can check
@@ -427,5 +429,25 @@ describe('checkDataTypeValidationRules', () => {
     expect(await checkDataTypeValidationRules({
       name: 't', validate, validationRules: [{ minLength: 1, message: 'empty' }, { custom: 'parses as JSON' }],
     })).toEqual([]);
+  });
+});
+
+describe('validation rules', () => {
+  test('a matches rule reads its pattern the same way as string(matches=...)', async () => {
+    const stringType = BaseDataTypes.find((t) => t.dataTypeName === 'string')!;
+    const stringPasses = async (matches: string, val: string) => (await stringType({ matches }).validate(val)) === true;
+    const rulePasses = (matches: string, val: string) => {
+      const result = checkValidationRules(val, [{ matches, message: 'no match' }]);
+      return result.passed === true;
+    };
+    // a regex-like string that does not compile (a repeated flag) is a literal pattern
+    expect(findValidationRulesProblem([{ matches: '/abc/gg', message: 'no match' }])).toBeUndefined();
+    for (const val of ['/abc/gg', 'abc']) {
+      expect(rulePasses('/abc/gg', val)).toBe(await stringPasses('/abc/gg', val));
+    }
+    expect(rulePasses('/abc/gg', 'x/abc/ggx')).toBe(true);
+    expect(rulePasses('/abc/gg', 'abc')).toBe(false);
+    // a pattern that does not compile either way is not a usable rule
+    expect(findValidationRulesProblem([{ matches: '/a(/', message: 'no match' }])).toMatch(/unsupported value for "matches"/);
   });
 });

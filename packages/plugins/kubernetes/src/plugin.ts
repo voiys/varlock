@@ -3,7 +3,7 @@ import { type Resolver, plugin } from 'varlock/plugin-lib';
 import { BUNDLED_ICONS } from './bundled-icons.gen';
 import * as k8s from '@kubernetes/client-node';
 
-const { SchemaError, ResolutionError, ValidationError } = plugin.ERRORS;
+const { SchemaError, ResolutionError } = plugin.ERRORS;
 
 const KUBERNETES_ICON = 'mdi:kubernetes';
 const SERVICE_ACCOUNT_NAMESPACE_PATH = '/var/run/secrets/kubernetes.io/serviceaccount/namespace';
@@ -606,13 +606,6 @@ plugin.registerDataType({
     // the same check as a non-empty trim(): \\s matches what trim() removes
     { matches: '/\\S/', message: 'Must be a non-empty bearer token' },
   ],
-  validationSamples: ['eyJhbGciOiJSUzI1NiIs', '   ', ' \\n '],
-  async validate(val): Promise<true> {
-    if (typeof val !== 'string' || val.trim().length === 0) {
-      throw new ValidationError('Must be a non-empty bearer token');
-    }
-    return true;
-  },
 });
 
 plugin.registerResolverFunction({
