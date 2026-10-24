@@ -471,7 +471,9 @@ export async function applyIncrementalSourceEdit(
       touched.add(k);
     }
   }
-  await graph.resolveEnvValues(rebuildOrdered);
+  // resolveEnvValues re-runs the cross-item check at its end, but returns early when given no keys
+  if (rebuildOrdered.length) await graph.resolveEnvValues(rebuildOrdered);
+  else g.checkForSensitiveValuesInsideNonSensitiveOnes();
   graph._allResolved = true;
   for (const k in graph.configSchema) {
     const errs = graph.configSchema[k].validationErrors;
