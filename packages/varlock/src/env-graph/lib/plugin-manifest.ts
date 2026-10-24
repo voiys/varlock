@@ -59,15 +59,37 @@ const DECORATOR_FIELDS: Record<string, FieldCheck> = {
   useFnArgsResolver: isBoolean,
   skipValueResolver: isBoolean,
 };
+const COERCED_TYPE_NAMES = ['string', 'int', 'number', 'boolean', 'object'];
+/** the shapes of `CoercedType` in data-types.ts */
+const isCoercedType = (val: unknown): boolean => {
+  if (isString(val)) return COERCED_TYPE_NAMES.includes(val as string);
+  if (!isPlainObject(val)) return false;
+  const keys = Object.keys(val);
+  if (keys.length !== 1) return false;
+  if (keys[0] === 'enum') {
+    return Array.isArray(val.enum) && val.enum.every((v) => isString(v) || isBoolean(v) || Number.isFinite(v));
+  }
+  if (keys[0] === 'arrayOf') return isCoercedType(val.arrayOf);
+  if (keys[0] === 'recordOf') {
+    const { recordOf } = val;
+    return isPlainObject(recordOf)
+      && Object.keys(recordOf).every((k) => k === 'keys' || k === 'values')
+      && Object.values(recordOf).every(isCoercedType);
+  }
+  return false;
+};
+
 const DATA_TYPE_FIELDS: Record<string, FieldCheck> = {
   name: isString,
   typeDescription: isString,
   icon: isString,
-  coercedType: (val) => isString(val) || (isPlainObject(val) && isJson(val)),
+  coercedType: isCoercedType,
   sensitive: isBoolean,
   internal: isBoolean,
   docs: (val) => Array.isArray(val)
     && val.every((d) => isString(d) || (isPlainObject(d) && isString(d.url) && isString(d.description))),
+  // not a def field: true when the plugin coerces values in code, which a manifest cannot carry
+  customCoerce: isBoolean,
 };
 const RESOLVER_FIELDS: Record<string, FieldCheck> = {
   name: isString,
@@ -116,14 +138,20 @@ export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
   if (plugin.bundledIcons && Object.keys(plugin.bundledIcons).length) {
     manifest.bundledIcons = { ...plugin.bundledIcons };
   }
-  if (plugin.standardVars) manifest.standardVars = structuredClone(plugin.standardVars);
+  if (plugin.standardVars) {
+    if (!isStandardVars(plugin.standardVars)) throw new Error(`Plugin ${plugin.name} has standardVars with an unexpected shape`);
+    manifest.standardVars = structuredClone(plugin.standardVars);
+  }
   const pick = (defs: Array<any> | undefined, fields: Record<string, FieldCheck>, where: string, nameKey = 'name') => (
     (defs ?? []).map((def) => pickFields(def, fields, nameKey, where))
   );
   manifest.rootDecorators = pick(plugin.rootDecorators, DECORATOR_FIELDS, 'root decorator');
   manifest.itemDecorators = pick(plugin.itemDecorators, DECORATOR_FIELDS, 'item decorator');
   // a data type that takes settings is a function of them: describe it with no settings
-  manifest.dataTypes = pick(plugin.dataTypes?.map((d) => (typeof d === 'function' ? d() : d)), DATA_TYPE_FIELDS, 'data type');
+  const dataTypeDefs = plugin.dataTypes?.map((d) => (typeof d === 'function' ? d() : d));
+  manifest.dataTypes = pick(dataTypeDefs, DATA_TYPE_FIELDS, 'data type').map((entry, i) => (
+    typeof dataTypeDefs![i].coerce === 'function' ? { ...entry, customCoerce: true } : entry
+  ));
   manifest.resolvers = pick(plugin.resolverFunctions, RESOLVER_FIELDS, 'resolver');
   manifest.codeGenerators = pick(plugin.codeGenerators, CODE_GENERATOR_FIELDS, 'code generator', 'decoratorName');
   return manifest;
@@ -188,7 +216,9 @@ export function applyPluginManifest(plugin: VarlockPlugin, manifest: PluginManif
   if (manifest.standardVars) plugin.standardVars = structuredClone(manifest.standardVars);
   for (const def of manifest.rootDecorators ?? []) plugin.registerRootDecorator(def as any);
   for (const def of manifest.itemDecorators ?? []) plugin.registerItemDecorator(def as any);
-  for (const def of manifest.dataTypes ?? []) plugin.registerDataType(def as any);
+  for (const { customCoerce, ...def } of manifest.dataTypes ?? []) {
+    plugin.registerDataType({ ...def, ...(customCoerce === true && { _coerceUnavailable: true }) } as any);
+  }
   for (const def of manifest.resolvers ?? []) {
     plugin.registerResolverFunction({ ...def, resolve: cannotRun(`${def.name}()`) } as any);
   }

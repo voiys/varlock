@@ -866,10 +866,16 @@ export class ConfigItem {
    * considered, not decorators, so an empty item with a skipped `@sensitive` still fails a required check.
    */
   get isValueUnknownInShapeLoad(): boolean {
-    return this._valueUnknownInShapeLoad;
+    return this._valueUnknownInShapeLoad || this._coercionSkippedInShapeLoad;
   }
   /** set once the value resolver has run, so dependents don't re-walk the resolver tree on every read */
   private _valueUnknownInShapeLoad = false;
+
+  /**
+   * @internal shape mode: the value could not be coerced, because its data type was read from a plugin
+   * manifest and the plugin's coerce() did not run
+   */
+  _coercionSkippedInShapeLoad = false;
 
   /**
    * Record the error for a required item with no value. A `@dynamic=boot` item is exempt when
@@ -1106,6 +1112,7 @@ export class ConfigItem {
     }
 
     let errorFromUnknownInput = false;
+    this._coercionSkippedInShapeLoad = false;
     if (!this.valueResolver) {
       this.isResolved = true;
       this.resolvedRawValue = undefined;
@@ -1196,6 +1203,17 @@ export class ConfigItem {
 
     const dataType = this.effectiveDataType;
     if (!dataType) throw new Error('expected dataType to be set');
+
+    // shape mode: this type's coerce() is plugin code that did not run (the plugin was read from its
+    // manifest), so the value is unknown, the same as a value from a skipped resolver
+    if (this.envGraph.mode === 'shape' && dataType._isCoerceUnavailable) {
+      this.envGraph.shapeSkipped.push({ kind: 'coerce', name: dataType.name, itemKey: this.key });
+      this._coercionSkippedInShapeLoad = true;
+      this.resolvedRawValue = undefined;
+      this.resolvedValue = undefined;
+      this.isValidated = true;
+      return;
+    }
 
     // COERCE VALUE - often will do nothing, but gives us a chance to convert strings to numbers, etc
     try {

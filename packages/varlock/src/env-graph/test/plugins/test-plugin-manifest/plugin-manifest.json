@@ -48,7 +48,8 @@
     {
       "name": "manifestTestPort",
       "icon": "mdi:ethernet",
-      "coercedType": "int"
+      "coercedType": "int",
+      "customCoerce": true
     }
   ],
   "resolvers": [

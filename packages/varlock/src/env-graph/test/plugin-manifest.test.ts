@@ -154,6 +154,31 @@ describe('plugin manifests', () => {
     expect(errorsOf(fromManifest)).toEqual({ BAD_TOKEN: [], DYNAMIC: [] });
   });
 
+  test('a value whose type the plugin coerces in code is unknown, and so are values built from it', async () => {
+    const schema = schemaFor(FIXTURE_DIR, 'PORT_COPY=$PORT\nPORT_URL=concat("http://localhost:", $PORT)');
+    const withoutManifest = copyFixture({ packageJson: (pkg) => delete pkg.exports['./manifest'] });
+    const executed = await load(schema.replace(FIXTURE_DIR, withoutManifest), 'shape');
+    const fromManifest = await load(schema, 'shape');
+    await executed.g.resolveEnvValues();
+    await fromManifest.g.resolveEnvValues();
+    const valuesOf = ({ g }: { g: EnvGraph }) => Object.fromEntries(['PORT', 'PORT_COPY', 'PORT_URL'].map((key) => [key, { value: g.configSchema[key].resolvedValue, unknown: g.configSchema[key].isValueUnknownInShapeLoad }]));
+    // control: running the plugin coerces the port to a number
+    expect(valuesOf(executed)).toEqual({
+      PORT: { value: 8080, unknown: false },
+      PORT_COPY: { value: '8080', unknown: false },
+      PORT_URL: { value: 'http://localhost:8080', unknown: false },
+    });
+    // from the manifest it can't, so it is unknown rather than the string "8080"
+    expect(valuesOf(fromManifest)).toEqual({
+      PORT: { value: undefined, unknown: true },
+      PORT_COPY: { value: undefined, unknown: true },
+      PORT_URL: { value: undefined, unknown: true },
+    });
+    expect(fromManifest.g.shapeSkipped).toContainEqual({ kind: 'coerce', name: 'manifestTestPort', itemKey: 'PORT' });
+    // a type the plugin does not coerce keeps its value
+    expect(fromManifest.g.configSchema.TAGGED.resolvedValue).toBe('x');
+  });
+
   test('a stub resolver never runs, even if the manifest marks it pure', async () => {
     const dir = copyFixture({
       manifest: (m) => {
@@ -173,6 +198,8 @@ describe('plugin manifests', () => {
     ['has an unknown manifestVersion', { manifest: (m: any) => { m.manifestVersion = 2; } }, /unsupported manifestVersion 2/],
     ['describes another plugin', { manifest: (m: any) => { m.name = 'other-plugin'; } }, /describes "other-plugin"/],
     ['has a malformed entry', { manifest: (m: any) => { m.resolvers[0].argsSchema = { type: 'nope' }; } }, /unsupported value for "argsSchema"/],
+    ['has a malformed coercedType', { manifest: (m: any) => { m.dataTypes[1].coercedType = { recordOf: null }; } }, /unsupported value for "coercedType"/],
+    ['has a nested malformed coercedType', { manifest: (m: any) => { m.dataTypes[1].coercedType = { arrayOf: { enum: 'bad' } }; } }, /unsupported value for "coercedType"/],
     ['is outside the package', { packageJson: (pkg: any) => { pkg.exports['./manifest'] = '../outside.json'; } }, /outside its package/],
     ['is missing', { packageJson: (pkg: any) => { pkg.exports['./manifest'] = './missing.json'; } }, /could not be read/],
   ])('a manifest that %s is a schema error, and the plugin does not run', async (_label, edit, message) => {
