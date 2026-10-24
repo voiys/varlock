@@ -23,7 +23,7 @@ import {
 } from './resolver';
 import { buildTypeSpecPlan, coercedTypesMatch, type TypeSpecPlan } from './type-decorator';
 import { ItemDecoratorInstance } from './decorators';
-import { toShapeRegExp } from './shape-regex';
+import { toSchemaRegExp } from './schema-regex';
 
 export type ConfigItemDef = {
   description?: string;
@@ -399,11 +399,14 @@ export class ConfigItem {
           resolverFns: this.envGraph.registeredResolverFunctions,
           dataSource: typeDec!.dataSource,
           warnings: this._typeSpecWarnings,
-          ...this.envGraph.mode === 'shape' && {
-            toRegExp: (value: RegExp | string) => toShapeRegExp(value, () => {
-              this.envGraph.recordShapeSkip({ kind: 'regex', name: String(value), itemKey: this.key });
-            }),
-          },
+          // schema regexes run on the linear-time engine (see schema-regex.ts)
+          toRegExp: (value: RegExp | string) => (this.envGraph.mode === 'shape'
+            ? toSchemaRegExp(value, {
+              onUnknown: () => {
+                this.envGraph.recordShapeSkip({ kind: 'regex', name: String(value), itemKey: this.key });
+              },
+            })
+            : toSchemaRegExp(value, { fallbackToJs: true })),
         }, typeDecParsedValue);
         // dynamic parts (option values / whole type) go through the normal resolver
         // lifecycle - process now (validates args, registers deps), resolve during item

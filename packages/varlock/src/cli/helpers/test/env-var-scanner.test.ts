@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { isDirExcluded, normalizeDirExclusions, scanCodeForEnvVars } from '../env-var-scanner';
+import { SchemaRegExp, loadSchemaRegexEngine } from '../../../env-graph/lib/schema-regex';
 
 describe('scanCodeForEnvVars', () => {
   let tempDir: string;
@@ -168,6 +169,19 @@ describe('scanCodeForEnvVars', () => {
     expect(result.keys).toContain('SVC_URL');
     const appId = result.references.find((ref) => ref.key === 'APP_ID');
     expect(appId).toMatchObject({ syntax: 'custom' });
+  });
+
+  test('a schema regex extra pattern stays on the linear-time engine', async () => {
+    await loadSchemaRegexEngine();
+    // `(a+)+` backtracks for seconds on the JS engine against a long run of a's that never matches
+    fs.writeFileSync(path.join(tempDir, 'app.ts'), `cfg("${'a'.repeat(30)}!"); cfg("APP_ID");\n`);
+    const t0 = performance.now();
+    const result = await scanCodeForEnvVars({
+      cwd: tempDir,
+      extraPatterns: [new SchemaRegExp('cfg\\("((?:a+)+|[A-Z_]+)"\\)')],
+    });
+    expect(performance.now() - t0).toBeLessThan(1000);
+    expect(result.keys).toContain('APP_ID');
   });
 
   test('ignores extraPattern matches without a first capture group', async () => {

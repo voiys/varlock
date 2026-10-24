@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { commandFn } from '../audit.command';
+import { SchemaRegExp } from '../../../env-graph/lib/schema-regex';
 
 const {
   gracefulExitMock,
@@ -102,6 +103,34 @@ describe('audit @auditExtraPatterns end to end', () => {
       | undefined;
     expect(options?.extraPatterns).toHaveLength(1);
     expect(options?.extraPatterns?.[0]?.fileTypes).toEqual(['tf', 'yaml']);
+    expect(gracefulExitMock).toHaveBeenCalledWith(0);
+  });
+
+  test('patterns run on the linear-time engine; one it does not support falls back with a warning', async () => {
+    fs.writeFileSync(path.join(tempDir, '.env.schema'), [
+      '# @auditExtraPatterns(regex(\'cfg\\.get\\("([A-Z_]+)"\\)\'), "/(?<=env:)([A-Z_]+)/")',
+      '# ---',
+      'APP_ID=',
+      '',
+    ].join('\n'));
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    scanCodeForEnvVarsMock.mockResolvedValue({ keys: ['APP_ID'], references: [], scannedFilesCount: 1 });
+
+    await commandFn({ values: { path: tempDir } } as any);
+
+    const warnings = consoleWarnSpy.mock.calls.map((args) => String(args[0]));
+    consoleWarnSpy.mockRestore();
+    const options = scanCodeForEnvVarsMock.mock.calls[0]?.[0] as { extraPatterns: Array<{ pattern: RegExp }> };
+    const [plain, lookbehind] = options.extraPatterns.map((p) => p.pattern);
+    expect(plain).toBeInstanceOf(SchemaRegExp);
+    expect((plain as SchemaRegExp).unsupported).toBeUndefined();
+    expect(lookbehind).toBeInstanceOf(SchemaRegExp);
+    expect((lookbehind as SchemaRegExp).unsupported).toBe('lookbehind');
+    // the fallback still matches as the JavaScript engine does
+    expect('x env:APP_ID'.match(lookbehind)?.[1]).toBe('APP_ID');
+    expect(warnings).toContainEqual(expect.stringContaining(
+      '@auditExtraPatterns() - regex /(?<=env:)([A-Z_]+)/ uses lookbehind, which the linear-time regex engine does not support. It runs on the JavaScript regex engine for now, but this fallback will be removed in a future version',
+    ));
     expect(gracefulExitMock).toHaveBeenCalledWith(0);
   });
 });

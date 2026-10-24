@@ -6,6 +6,7 @@ import { FileBasedDataSource } from '../../env-graph';
 import { CliExitError } from '../helpers/exit-error';
 import { parseRegexLikeString } from '../../env-graph/lib/resolver';
 import { compileGlob, type GlobMatcher } from '../../env-graph/lib/glob';
+import { toSchemaRegExp, unsupportedRegexWarning } from '../../env-graph/lib/schema-regex';
 import { loadVarlockEnvGraph } from '../../lib/load-graph';
 import { checkForNoEnvFiles, checkForSchemaErrors } from '../helpers/error-checks';
 import { type TypedGunshiCommandFn } from '../helpers/gunshi-type-utils';
@@ -83,7 +84,11 @@ function collectPatternArgs(input: unknown, out: Array<RegExp>, stats: { regexSt
     if (parsed) {
       // deprecated spelling - still honoured, the caller prints one warning for all of them
       stats.regexStrings++;
-      out.push(parsed);
+      // run on the linear-time engine like a regex() call (see schema-regex.ts)
+      const regex = toSchemaRegExp(parsed, { fallbackToJs: true });
+      const warning = unsupportedRegexWarning(regex, '@auditExtraPatterns()');
+      if (warning) console.warn(ansis.yellow(`⚠️  ${warning.message}`));
+      out.push(regex);
       return;
     }
   }

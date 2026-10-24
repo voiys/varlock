@@ -46,7 +46,7 @@ import { parseDuration } from '../../lib/duration';
 import { hashEnvSourceContents } from '../../lib/env-source-fingerprint';
 import { MIN_SENSITIVE_VALUE_LENGTH, SHORT_SENSITIVE_VALUE_LENGTH, collectLeaves } from '../../lib/sensitive-value';
 import { markItemResolutionStarted, markItemResolutionFinished } from './pending-resolutions';
-import { loadShapeRegexEngine } from './shape-regex';
+import { loadSchemaRegexEngine } from './schema-regex';
 
 /**
  * Credential options written as `$ITEM`, mapped to the referenced item name.
@@ -642,8 +642,8 @@ export class EnvGraph {
 
   async setRootDataSource(source: EnvGraphDataSource) {
     if (this.rootDataSource) throw new Error('root data source already set');
-    // shape mode runs schema-supplied regexes on a linear-time engine (see shape-regex.ts)
-    if (this.mode === 'shape') await loadShapeRegexEngine();
+    // schema-supplied regexes run on a linear-time engine (see schema-regex.ts)
+    await loadSchemaRegexEngine();
     this.rootDataSource = source;
     source.graph = this;
     await source.finishInit();

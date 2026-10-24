@@ -25,7 +25,7 @@ import { DecoratorInstance } from './decorators';
 import { getErrorLocation } from './error-location';
 import { isBuiltinVar } from './builtin-vars';
 import { REGEX_LIKE_STRING, parseRegexLikeString } from './regex-like-string';
-import { ShapeRegExp, toShapeRegExp } from './shape-regex';
+import { SchemaRegExp, unsupportedRegexWarning } from './schema-regex';
 
 const execAsync = promisify(exec);
 
@@ -121,19 +121,32 @@ export class Resolver {
   _errors: Array<SchemaError> = [];
 
   /**
-   * A match value that only turns out to be a `/.../` string once resolved (`$PATTERN`)
-   * gets the same deprecation warning a static one gets at process time. Static ones are
-   * skipped here since they were already warned about; repeat resolves never stack it.
+   * A schema regex, run on the linear-time engine (see schema-regex.ts). Outside shape mode, a pattern the
+   * engine does not support runs on the JS engine; in shape mode its matches are unknown, and recorded
+   * in `shapeSkipped`
    */
-  /**
-   * shape mode: a schema regex runs on the linear-time engine (see shape-regex.ts). Returns the regex to
-   * use, and an unknown match is recorded in `shapeSkipped`
-   */
-  protected schemaRegExp(value: RegExp | string): RegExp | null {
+  protected newSchemaRegExp(source: string | RegExp, flags?: string, name?: string) {
     const graph = this.envGraph ?? this.dataSource?.graph;
-    if (graph?.mode !== 'shape') return value instanceof RegExp ? value : parseRegexLikeString(value);
-    if (typeof value === 'string' && !REGEX_LIKE_STRING.test(value)) return null;
-    return toShapeRegExp(value, () => graph.recordShapeSkip({ kind: 'regex', name: String(value) }));
+    const shapeLoad = graph?.mode === 'shape';
+    const regex = new SchemaRegExp(source, flags, {
+      fallbackToJs: !shapeLoad,
+      ...shapeLoad && { onUnknown: () => graph.recordShapeSkip({ kind: 'regex', name: name ?? String(source) }) },
+    });
+    this.warnUnsupportedRegex(regex);
+    return regex;
+  }
+
+  /** a `/pattern/flags` string as a schema regex (see `newSchemaRegExp`), or null if it is not one */
+  protected schemaRegExpFromString(value: string): RegExp | null {
+    const parsed = parseRegexLikeString(value);
+    return parsed && this.newSchemaRegExp(parsed, undefined, value);
+  }
+
+  /** warns (once) about a schema regex the linear-time engine does not support */
+  protected warnUnsupportedRegex(regex: RegExp) {
+    const warning = unsupportedRegexWarning(regex);
+    if (!warning || this._errors.some((e) => e.message === warning.message)) return;
+    this._errors.push(warning);
   }
 
   /**
@@ -142,12 +155,17 @@ export class Resolver {
    */
   protected testSchemaRegExp(regex: RegExp, input: unknown): boolean | undefined {
     if (input === undefined) return false;
-    if (!(regex instanceof ShapeRegExp)) return regex.test(String(input));
+    if (!(regex instanceof SchemaRegExp)) return regex.test(String(input));
     const matched = regex.testKnown(String(input));
     if (matched === undefined) this._unknownInShapeLoad = true;
     return matched;
   }
 
+  /**
+   * A match value that only turns out to be a `/.../` string once resolved (`$PATTERN`)
+   * gets the same deprecation warning a static one gets at process time. Static ones are
+   * skipped here since they were already warned about; repeat resolves never stack it.
+   */
   protected warnDynamicRegexString(source: Resolver, str: string) {
     // eslint-disable-next-line no-use-before-define
     if (source instanceof StaticValueResolver) return;
@@ -647,14 +665,7 @@ export const RegexResolver: typeof Resolver = createResolver({
       flags = flagsVal;
     }
     try {
-      const graph = this.envGraph ?? this.dataSource?.graph;
-      // shape mode: a schema regex runs on the linear-time engine (see shape-regex.ts)
-      if (graph?.mode === 'shape') {
-        return new ShapeRegExp(regexStr, flags, {
-          onUnknown: () => graph.recordShapeSkip({ kind: 'regex', name: `regex(${JSON.stringify(regexStr)})` }),
-        });
-      }
-      return new RegExp(regexStr, flags);
+      return this.newSchemaRegExp(regexStr, flags, `regex(${JSON.stringify(regexStr)})`);
     } catch (err) {
       throw new SchemaError((err as Error).message);
     }
@@ -720,7 +731,7 @@ export const RemapResolver: typeof Resolver = createResolver({
           continue;
         }
         if (typeof matchVal === 'string') {
-          const regex = this.schemaRegExp(matchVal);
+          const regex = this.schemaRegExpFromString(matchVal);
           if (regex) {
             this.warnDynamicRegexString(matchValResolver, matchVal);
             const matched = this.testSchemaRegExp(regex, originalValue);
@@ -747,7 +758,7 @@ export const RemapResolver: typeof Resolver = createResolver({
         continue;
       }
       if (typeof matchVal === 'string') {
-        const regex = this.schemaRegExp(matchVal);
+        const regex = this.schemaRegExpFromString(matchVal);
         if (regex) {
           this.warnDynamicRegexString(remainingArgs[i], matchVal);
           const matched = this.testSchemaRegExp(regex, originalValue);

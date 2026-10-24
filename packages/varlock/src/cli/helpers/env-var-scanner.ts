@@ -692,8 +692,11 @@ function normalizeExtraPatterns(
   for (const entry of input ?? []) {
     const pattern = entry instanceof RegExp ? entry : entry.pattern;
     // `matchAll` requires the global flag, and a non-global pattern is what a user
-    // writing `/.../ ` naturally produces.
-    const regex = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
+    // writing `/.../ ` naturally produces. The copy keeps the pattern's class, so a schema
+    // regex stays on the linear-time engine.
+    const regex = pattern.global
+      ? pattern
+      : new (pattern.constructor as RegExpConstructor)(pattern, `${pattern.flags}g`);
 
     const rawFileTypes = entry instanceof RegExp ? undefined : entry.fileTypes;
     const extensions = new Set<string>();

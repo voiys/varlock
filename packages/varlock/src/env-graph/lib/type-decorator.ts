@@ -14,6 +14,7 @@ import {
   assertUnwrappedRegexSource, convertParsedValueToResolvers, deprecatedRegexStringWarning,
   type Resolver,
 } from './resolver';
+import { unsupportedRegexWarning } from './schema-regex';
 import type { EnvGraphDataSource } from './data-source';
 import { SchemaError } from './errors';
 
@@ -27,8 +28,8 @@ export type TypeSpecContext = {
   /** advisory findings about the spec (deprecations) - the caller attaches them to the item */
   warnings?: Array<SchemaError>;
   /**
-   * shape mode: turns a schema-supplied regex into one that runs on the linear-time engine
-   * (see shape-regex.ts)
+   * turns a schema-supplied regex into one that runs on the linear-time engine (see schema-regex.ts).
+   * Throws the JS syntax error for an invalid pattern
    */
   toRegExp?: (value: RegExp | string) => RegExp;
 };
@@ -203,13 +204,26 @@ function notLoadedPluginTypePlan(ctx: TypeSpecContext, name: string, context?: s
   return { deferred: [], build: () => factory() };
 }
 
-/** shape mode: every schema regex in the settings runs on the linear-time engine */
-function regexSettingsForShapeLoad(ctx: TypeSpecContext, typeName: string, settings: Record<string, any>) {
+/** every schema regex in the settings runs on the linear-time engine (see schema-regex.ts) */
+function schemaRegexSettings(
+  ctx: TypeSpecContext,
+  typeName: string,
+  settings: Record<string, any>,
+  context: string,
+) {
   if (!ctx.toRegExp) return settings;
   const out: Record<string, any> = {};
   for (const [key, val] of Object.entries(settings)) {
     const isRegex = val instanceof RegExp || (readsOptionAsRegex(typeName, key) && typeof val === 'string');
-    out[key] = isRegex ? ctx.toRegExp(val) : val;
+    let regex: RegExp | undefined;
+    try {
+      if (isRegex) regex = ctx.toRegExp(val);
+    } catch {
+      // an invalid pattern string: left as it is, so the type reports it as it always has
+    }
+    out[key] = regex ?? val;
+    const warning = regex && unsupportedRegexWarning(regex, `${context} - option "${key}"`);
+    if (warning) pushWarningOnce(ctx.warnings, warning);
   }
   return out;
 }
@@ -573,7 +587,7 @@ function buildTypeCallPlan(
           pushWarningOnce(ctx.warnings, deprecatedRegexStringWarning(val, `${context} - option "${key}"`));
         }
       }
-      if (Object.keys(materialized).length) return factory(regexSettingsForShapeLoad(ctx, name, materialized));
+      if (Object.keys(materialized).length) return factory(schemaRegexSettings(ctx, name, materialized, context));
       return factory();
     },
   };
