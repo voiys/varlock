@@ -83,9 +83,11 @@ This loads the schema in [shape mode](/guides/shape-mode/). It skips `exec()` an
 
 For most schemas the generated files are identical to a normal `varlock codegen`. They can differ when something in the schema depends on a value that shape mode skips or ignores, such as a generator option set from an env var (`processEnv=if(forEnv(prod), none, strict)`), or an item created at load time by `@setValuesBulk(..., createMissing=true)`. See [what changes](/guides/shape-mode/#what-changes).
 
+Generated files must stay inside the directory the schema was loaded from. A `path` that leads out of it (through `../`, an absolute path elsewhere, or a symlink) is a schema error under `--shape` and `--watch` instead of a write, so in a monorepo where one schema writes types into another package, run a normal `varlock codegen` for that step.
+
 Limits:
 - A plugin that is already installed is still imported, its resolver hooks run, and generators that plugins register run. `--shape` is not a sandbox for plugins you don't trust.
-- [Builtin variables](/reference/builtin-variables/) such as `VARLOCK_ENV` and CI detection still read the environment, so an option that depends on one can still change with it.
+- [Builtin variables](/reference/builtin-variables/) are computed from an empty environment instead of your shell's: `VARLOCK_ENV` is `development`, `VARLOCK_IS_CI` is `false`, CI values such as `VARLOCK_COMMIT_SHA` are not set, and `VARLOCK_BRANCH` is unknown. An option that depends on one of them gets the value it would get locally outside CI, even when codegen runs in CI.
 
 ## Watching for changes
 
