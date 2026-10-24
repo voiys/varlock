@@ -1344,7 +1344,7 @@ export class ConfigItem {
       if (!(arg instanceof StaticValueResolver) || arg.staticValue === undefined) return;
       matchEnvs.push(String(arg.staticValue));
     }
-    return { envFlagKey, matchEnvs, requiredWhenMatched: !usingOptional };
+    return { matchEnvs, requiredWhenMatched: !usingOptional };
   }
 
   /**
@@ -1598,13 +1598,11 @@ export type TypeGenItemInfo = {
   isRequired: boolean;
   isRequiredDynamic: boolean;
   /**
-   * Set when requiredness depends only on the current environment (`forEnv()` with static args):
+   * Set when requiredness depends only on the root's @currentEnv item (`forEnv()` with static args):
    * the item is required when the env is one of `matchEnvs` if `requiredWhenMatched`, and
    * required in every other env otherwise
    */
   requiredByEnv?: {
-    /** key of the @currentEnv item the envs refer to */
-    envFlagKey: string;
     matchEnvs: Array<string>;
     requiredWhenMatched: boolean;
   };

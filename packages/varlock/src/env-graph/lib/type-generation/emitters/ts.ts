@@ -277,12 +277,7 @@ function resolveTsGenOptions(options: Record<string, any> = {}): Required<TsGenO
  * (rather than `Omit<...> & {...}`) keep every property linked to its declaration in the base
  * schema, so go-to-definition and rename still work from `ENV.X`.
  */
-function getEnvNarrowedMembers(
-  fields: Array<ResolvedFieldType>,
-  envFlagKey: string,
-  baseType: string,
-  schemaType: string,
-): Array<string> {
+function getEnvNarrowedMembers(fields: Array<ResolvedFieldType>, envFlagKey: string): Array<string> {
   const errPrefix = '@generateTsTypes - `narrowByEnv`';
   if (!envFlagKey) throw new Error(`${errPrefix} needs @currentEnv to be set`);
   const envField = fields.find((f) => f.key === envFlagKey);
@@ -294,13 +289,12 @@ function getEnvNarrowedMembers(
     throw new Error(`${errPrefix} needs the @currentEnv item \`${envFlagKey}\` to be an enum, e.g. \`@type=enum(development, production)\``);
   }
 
+  const envDependentFields = fields.flatMap((f) => (f.requiredByEnv ? [{ key: f.key, ...f.requiredByEnv }] : []));
   const groups = new Map<string, { envs: Array<string | number | boolean>, requiredKeys: Array<string> }>();
   for (const env of envType.enum) {
-    const requiredKeys = fields.filter((f) => {
-      const byEnv = f.requiredByEnv;
-      if (!byEnv || byEnv.envFlagKey !== envFlagKey) return false;
-      return byEnv.matchEnvs.includes(String(env)) === byEnv.requiredWhenMatched;
-    }).map((f) => f.key);
+    const requiredKeys = envDependentFields
+      .filter((f) => f.matchEnvs.includes(String(env)) === f.requiredWhenMatched)
+      .map((f) => f.key);
     const groupId = requiredKeys.join(',');
     const group = groups.get(groupId);
     if (group) group.envs.push(env);
@@ -310,13 +304,13 @@ function getEnvNarrowedMembers(
   const members = [...groups.values()].map(({ envs, requiredKeys }) => {
     const props = [
       `readonly ${tsPropertyKey(envFlagKey)}: ${envs.map((e) => JSON.stringify(e)).join(' | ')}`,
-      ...requiredKeys.map((key) => `readonly ${tsPropertyKey(key)}: NonNullable<${schemaType}[${JSON.stringify(key)}]>`),
+      ...requiredKeys.map((key) => `readonly ${tsPropertyKey(key)}: NonNullable<CoercedEnvSchema[${JSON.stringify(key)}]>`),
     ];
-    return `(${baseType} & { ${props.join('; ')} })`;
+    return `(Readonly<CoercedEnvSchema> & { ${props.join('; ')} })`;
   });
   // an optional env flag can be unset at runtime, so keep a member for that (nothing narrowed)
   if (!envField.isRequired) {
-    members.push(`(${baseType} & { readonly ${tsPropertyKey(envFlagKey)}?: undefined })`);
+    members.push(`(Readonly<CoercedEnvSchema> & { readonly ${tsPropertyKey(envFlagKey)}?: undefined })`);
   }
   return members;
 }
@@ -363,7 +357,7 @@ export async function generateTsTypesSrc(fields: Array<ResolvedFieldType>, optio
   // `narrowByEnv`: the schema split by the current environment, so checks narrow requiredness
   const narrowedAlias = `_CoercedEnvSchemaByEnv_${schemaHash}`;
   if (opts.narrowByEnv) {
-    const members = getEnvNarrowedMembers(fields, opts.envFlagKey, 'Readonly<CoercedEnvSchema>', 'CoercedEnvSchema');
+    const members = getEnvNarrowedMembers(fields, opts.envFlagKey);
     tsSrc.push(
       '',
       `// \`CoercedEnvSchema\` split by the current environment (\`${opts.envFlagKey}\`), so that checking`,

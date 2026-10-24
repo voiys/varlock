@@ -16,6 +16,21 @@ import { getTypeGenInfoMap, loadGraph } from './helpers';
 // declaration of `ENV` (not a stub)
 const VARLOCK_ENV_SRC = path.resolve(__dirname, '../../../runtime/env.ts');
 
+/**
+ * One compiler host for every typecheck below, which parses the TypeScript lib `.d.ts` files once
+ * instead of once per program. They never change, and nothing in them depends on the options that
+ * differ between checks (`strict`).
+ */
+const compilerHost = ts.createCompilerHost({});
+const libDir = compilerHost.getDefaultLibLocation!();
+const libSourceFiles = new Map<string, ts.SourceFile | undefined>();
+const readSourceFile = compilerHost.getSourceFile;
+compilerHost.getSourceFile = (fileName, ...args) => {
+  if (!fileName.startsWith(`${libDir}/`)) return readSourceFile(fileName, ...args);
+  if (!libSourceFiles.has(fileName)) libSourceFiles.set(fileName, readSourceFile(fileName, ...args));
+  return libSourceFiles.get(fileName);
+};
+
 const tmpDirs: Array<string> = [];
 afterAll(() => {
   for (const dir of tmpDirs) fs.rmSync(dir, { recursive: true, force: true });
@@ -58,6 +73,7 @@ async function generateAndTypecheck(opts: {
       types: [],
       paths: { 'varlock/env': [VARLOCK_ENV_SRC] },
     },
+    host: compilerHost,
   });
   const sourceFile = program.getSourceFile(checkFile)!;
   const errors = [
@@ -92,10 +108,10 @@ describe('@generateTsTypes narrowByEnv', () => {
       const g = await loadGraph({ envFile: ISSUE_SCHEMA.replace('OUTPUT_PATH', 'unused.d.ts') });
       const infos = await getTypeGenInfoMap(g);
       expect(infos.DATABASE_PASSWORD.requiredByEnv).toEqual({
-        envFlagKey: 'APP_ENV', matchEnvs: ['building'], requiredWhenMatched: false,
+        matchEnvs: ['building'], requiredWhenMatched: false,
       });
       expect(infos.SENTRY_DSN.requiredByEnv).toEqual({
-        envFlagKey: 'APP_ENV', matchEnvs: ['prod'], requiredWhenMatched: true,
+        matchEnvs: ['prod'], requiredWhenMatched: true,
       });
       // static requiredness is not env-dependent
       expect(infos.ALWAYS_OPTIONAL.requiredByEnv).toBeUndefined();
@@ -154,7 +170,7 @@ describe('@generateTsTypes narrowByEnv', () => {
       });
       const infos = await getTypeGenInfoMap(g);
       expect(infos.SHARED_ITEM.requiredByEnv).toEqual({
-        envFlagKey: 'APP_ENV', matchEnvs: ['prod'], requiredWhenMatched: true,
+        matchEnvs: ['prod'], requiredWhenMatched: true,
       });
       // forEnv() there checks OTHER_ENV, so APP_ENV says nothing about it
       expect(infos.OTHER_ITEM.isRequiredDynamic).toBe(true);
