@@ -565,8 +565,6 @@ async function registerPluginInGraph(
   graph: EnvGraph,
   plugin: VarlockPlugin,
   pluginDecorator: RootDecoratorInstance,
-  /** when set, the plugin is described by its manifest and its module is never executed */
-  manifest?: PluginManifest,
 ) {
   let existingPlugin: VarlockPlugin | undefined;
   for (const possibleMatchingPlugin of graph.plugins) {
@@ -595,6 +593,9 @@ async function registerPluginInGraph(
     existingPlugin.installDecoratorInstances.push(pluginDecorator);
     return;
   }
+
+  // shape mode describes a plugin from the manifest it ships instead of running its code
+  const manifest = graph.mode === 'shape' ? await readPluginManifest(plugin) : undefined;
 
   plugin.installDecoratorInstances.push(pluginDecorator);
   graph.plugins.push(plugin);
@@ -967,10 +968,8 @@ export async function processPluginInstallDecorators(dataSource: EnvGraphDataSou
         }
 
         const plugin = await initPluginFromLocalPath(pluginSrcPath);
-        // shape mode describes a plugin from the manifest it ships instead of running its code
-        const manifest = graph.mode === 'shape' ? await readPluginManifest(plugin) : undefined;
         // might return an existing plugin if matches one in the graph
-        await registerPluginInGraph(graph, plugin, pluginDecorator, manifest);
+        await registerPluginInGraph(graph, plugin, pluginDecorator);
       } catch (err) {
         pluginDecorator._errors.push(err instanceof SchemaError ? err : new SchemaError(err as Error));
         continue;

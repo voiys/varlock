@@ -99,9 +99,10 @@ type EnvGraphDataTypeDef<CoerceReturnType, ValidateInputType = FallbackIfUnknown
 
   /**
    * @internal set on a type read from a plugin manifest when the plugin coerces values in code,
-   * which did not run, so shape mode treats a value of this type as unknown
+   * which did not run, so shape mode treats a value of this type as unknown.
+   * A manifest data type entry carries the same field.
    */
-  _coerceUnavailable?: boolean;
+  coerceUnavailable?: boolean;
   // do we want to allow adding settings that usually come from other decorators?
   // specific items - docs, sensitive, example, etc
   // or just a way to add arbitrary other decorators?
@@ -132,12 +133,12 @@ export class EnvGraphDataType {
   get isInternal() { return this.def.internal; }
   get docsEntries() { return this.def.docs; }
   get coercedType() { return this.def.coercedType; }
-  /** @internal see `_coerceUnavailable` on the def. Also true for a composite type (array, record) built from one */
-  get _isCoerceUnavailable(): boolean {
-    if (this.def._coerceUnavailable) return true;
+  /** @internal see `coerceUnavailable` on the def. Also true for a composite type (array, record) built from one */
+  get coerceUnavailable(): boolean {
+    if (this.def.coerceUnavailable) return true;
     const settings = this.usageArgs[0];
     return _.isPlainObject(settings)
-      && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val._isCoerceUnavailable);
+      && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val.coerceUnavailable);
   }
 
   generatePlaceholder(seed: string) {

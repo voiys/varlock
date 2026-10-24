@@ -1,3 +1,4 @@
+import _ from '@env-spec/utils/my-dash';
 import { SchemaError } from './errors';
 import type { VarlockPlugin } from './plugins';
 
@@ -29,50 +30,45 @@ export type PluginManifest = {
 
 type FieldCheck = (val: unknown) => boolean;
 
-const isString: FieldCheck = (val) => typeof val === 'string';
-const isBoolean: FieldCheck = (val) => typeof val === 'boolean';
-const isStringArray: FieldCheck = (val) => Array.isArray(val) && val.every(isString);
-const isPlainObject = (val: unknown): val is Record<string, unknown> => (
-  typeof val === 'object' && val !== null && Object.getPrototypeOf(val) === Object.prototype
-);
+const isStringArray: FieldCheck = (val) => Array.isArray(val) && val.every(_.isString);
 /** plain JSON data: survives JSON.stringify/parse unchanged */
 const isJson: FieldCheck = (val) => {
-  if (val === null || isString(val) || isBoolean(val)) return true;
+  if (val === null || _.isString(val) || _.isBoolean(val)) return true;
   if (typeof val === 'number') return Number.isFinite(val);
   if (Array.isArray(val)) return val.every(isJson);
-  if (isPlainObject(val)) return Object.values(val).every(isJson);
+  if (_.isPlainObject(val)) return Object.values(val).every(isJson);
   return false;
 };
 
 // the data fields of each kind of registration, in the order they are written to a manifest.
 // Function members are never carried, and unknown fields are ignored when reading.
 const DECORATOR_FIELDS: Record<string, FieldCheck> = {
-  name: isString,
-  description: isString,
-  isFunction: isBoolean,
-  isFunctionOrValue: isBoolean,
-  allowDualPlacement: isBoolean,
-  inert: isBoolean,
-  deprecated: (val) => isBoolean(val) || isString(val),
+  name: _.isString,
+  description: _.isString,
+  isFunction: _.isBoolean,
+  isFunctionOrValue: _.isBoolean,
+  allowDualPlacement: _.isBoolean,
+  inert: _.isBoolean,
+  deprecated: (val) => _.isBoolean(val) || _.isString(val),
   incompatibleWith: isStringArray,
-  objectValueExample: isString,
-  useFnArgsResolver: isBoolean,
-  skipValueResolver: isBoolean,
+  objectValueExample: _.isString,
+  useFnArgsResolver: _.isBoolean,
+  skipValueResolver: _.isBoolean,
 };
 const COERCED_TYPE_NAMES = ['string', 'int', 'number', 'boolean', 'object'];
 /** the shapes of `CoercedType` in data-types.ts */
 const isCoercedType = (val: unknown): boolean => {
-  if (isString(val)) return COERCED_TYPE_NAMES.includes(val as string);
-  if (!isPlainObject(val)) return false;
+  if (_.isString(val)) return COERCED_TYPE_NAMES.includes(val as string);
+  if (!_.isPlainObject(val)) return false;
   const keys = Object.keys(val);
   if (keys.length !== 1) return false;
   if (keys[0] === 'enum') {
-    return Array.isArray(val.enum) && val.enum.every((v) => isString(v) || isBoolean(v) || Number.isFinite(v));
+    return Array.isArray(val.enum) && val.enum.every((v) => _.isString(v) || _.isBoolean(v) || Number.isFinite(v));
   }
   if (keys[0] === 'arrayOf') return isCoercedType(val.arrayOf);
   if (keys[0] === 'recordOf') {
     const { recordOf } = val;
-    return isPlainObject(recordOf)
+    return _.isPlainObject(recordOf)
       && Object.keys(recordOf).every((k) => k === 'keys' || k === 'values')
       && Object.values(recordOf).every(isCoercedType);
   }
@@ -80,36 +76,36 @@ const isCoercedType = (val: unknown): boolean => {
 };
 
 const DATA_TYPE_FIELDS: Record<string, FieldCheck> = {
-  name: isString,
-  typeDescription: isString,
-  icon: isString,
+  name: _.isString,
+  typeDescription: _.isString,
+  icon: _.isString,
   coercedType: isCoercedType,
-  sensitive: isBoolean,
-  internal: isBoolean,
+  sensitive: _.isBoolean,
+  internal: _.isBoolean,
   docs: (val) => Array.isArray(val)
-    && val.every((d) => isString(d) || (isPlainObject(d) && isString(d.url) && isString(d.description))),
-  // not a def field: true when the plugin coerces values in code, which a manifest cannot carry
-  customCoerce: isBoolean,
+    && val.every((d) => _.isString(d) || (_.isPlainObject(d) && _.isString(d.url) && _.isString(d.description))),
+  // true when the plugin coerces values in code, which a manifest cannot carry
+  coerceUnavailable: _.isBoolean,
 };
 const RESOLVER_FIELDS: Record<string, FieldCheck> = {
-  name: isString,
-  label: isString,
-  description: isString,
-  icon: isString,
-  inferredType: isString,
-  inferredTypeSettings: (val) => isPlainObject(val) && isJson(val),
-  impliesSensitive: isBoolean,
-  argsSchema: (val) => isPlainObject(val) && ['array', 'object', 'mixed'].includes(val.type as string)
+  name: _.isString,
+  label: _.isString,
+  description: _.isString,
+  icon: _.isString,
+  inferredType: _.isString,
+  inferredTypeSettings: (val) => _.isPlainObject(val) && isJson(val),
+  impliesSensitive: _.isBoolean,
+  argsSchema: (val) => _.isPlainObject(val) && ['array', 'object', 'mixed'].includes(val.type as string)
     && Object.entries(val).every(([k, v]) => k === 'type' || (Number.isInteger(v) && (v as number) >= 0)),
 };
 const CODE_GENERATOR_FIELDS: Record<string, FieldCheck> = {
-  decoratorName: isString,
+  decoratorName: _.isString,
   knownOptions: isStringArray,
 };
 
 /** copies the known data fields of `def`, in a stable order, checking each one */
 function pickFields(def: Entry, fields: Record<string, FieldCheck>, nameKey: string, where: string): Entry {
-  if (!isPlainObject(def) || !isString(def[nameKey]) || !def[nameKey]) {
+  if (!_.isPlainObject(def) || !_.isString(def[nameKey]) || !def[nameKey]) {
     throw new Error(`${where}: expected an object with a "${nameKey}"`);
   }
   const picked: Entry = {};
@@ -121,12 +117,12 @@ function pickFields(def: Entry, fields: Record<string, FieldCheck>, nameKey: str
   return picked;
 }
 
-const isStandardVars = (val: unknown) => isPlainObject(val)
-  && isString(val.initDecorator)
-  && isPlainObject(val.params)
-  && Object.values(val.params).every((p) => isPlainObject(p)
-    && (isString(p.key) || (isStringArray(p.key) && (p.key as Array<string>).length > 0))
-    && (p.dataType === undefined || isString(p.dataType)));
+const isStandardVars = (val: unknown) => _.isPlainObject(val)
+  && _.isString(val.initDecorator)
+  && _.isPlainObject(val.params)
+  && Object.values(val.params).every((p) => _.isPlainObject(p)
+    && (_.isString(p.key) || (isStringArray(p.key) && (p.key as Array<string>).length > 0))
+    && (p.dataType === undefined || _.isString(p.dataType)));
 
 /** builds the manifest for a plugin whose module has already been executed */
 export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
@@ -150,7 +146,7 @@ export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
   // a data type that takes settings is a function of them: describe it with no settings
   const dataTypeDefs = plugin.dataTypes?.map((d) => (typeof d === 'function' ? d() : d));
   manifest.dataTypes = pick(dataTypeDefs, DATA_TYPE_FIELDS, 'data type').map((entry, i) => (
-    typeof dataTypeDefs![i].coerce === 'function' ? { ...entry, customCoerce: true } : entry
+    typeof dataTypeDefs![i].coerce === 'function' ? { ...entry, coerceUnavailable: true } : entry
   ));
   manifest.resolvers = pick(plugin.resolverFunctions, RESOLVER_FIELDS, 'resolver');
   manifest.codeGenerators = pick(plugin.codeGenerators, CODE_GENERATOR_FIELDS, 'code generator', 'decoratorName');
@@ -165,15 +161,15 @@ export function parsePluginManifest(raw: unknown, expectedName: string, manifest
   const fail = (problem: string): never => {
     throw new SchemaError(`Plugin manifest ${manifestPath} is invalid: ${problem}`);
   };
-  if (!isPlainObject(raw)) return fail('expected a JSON object');
+  if (!_.isPlainObject(raw)) return fail('expected a JSON object');
   if (raw.manifestVersion !== PLUGIN_MANIFEST_VERSION) {
     const version = JSON.stringify(raw.manifestVersion);
     return fail(`unsupported manifestVersion ${version} (this version of varlock reads ${PLUGIN_MANIFEST_VERSION})`);
   }
   if (raw.name !== expectedName) return fail(`it describes "${String(raw.name)}", not "${expectedName}"`);
-  if (raw.icon !== undefined && !isString(raw.icon)) fail('"icon" must be a string');
+  if (raw.icon !== undefined && !_.isString(raw.icon)) fail('"icon" must be a string');
   const { bundledIcons } = raw;
-  if (bundledIcons !== undefined && !(isPlainObject(bundledIcons) && Object.values(bundledIcons).every(isString))) {
+  if (bundledIcons !== undefined && !(_.isPlainObject(bundledIcons) && Object.values(bundledIcons).every(_.isString))) {
     fail('"bundledIcons" must map icon names to SVG strings');
   }
   if (raw.standardVars !== undefined && !isStandardVars(raw.standardVars)) fail('"standardVars" has an unexpected shape');
@@ -216,9 +212,7 @@ export function applyPluginManifest(plugin: VarlockPlugin, manifest: PluginManif
   if (manifest.standardVars) plugin.standardVars = structuredClone(manifest.standardVars);
   for (const def of manifest.rootDecorators ?? []) plugin.registerRootDecorator(def as any);
   for (const def of manifest.itemDecorators ?? []) plugin.registerItemDecorator(def as any);
-  for (const { customCoerce, ...def } of manifest.dataTypes ?? []) {
-    plugin.registerDataType({ ...def, ...(customCoerce === true && { _coerceUnavailable: true }) } as any);
-  }
+  for (const def of manifest.dataTypes ?? []) plugin.registerDataType(def as any);
   for (const def of manifest.resolvers ?? []) {
     plugin.registerResolverFunction({ ...def, resolve: cannotRun(`${def.name}()`) } as any);
   }

@@ -871,6 +871,13 @@ export class ConfigItem {
   /** set once the value resolver has run, so dependents don't re-walk the resolver tree on every read */
   private _valueUnknownInShapeLoad = false;
 
+  /** shape mode: an unknown value (or a known part of one) is left unset, and is neither coerced nor validated */
+  private clearUnknownValue() {
+    this.resolvedRawValue = undefined;
+    this.resolvedValue = undefined;
+    this.isValidated = true;
+  }
+
   /**
    * @internal shape mode: the value could not be coerced, because its data type was read from a plugin
    * manifest and the plugin's coerce() did not run
@@ -1148,9 +1155,7 @@ export class ConfigItem {
     // shape mode: a value built from a skipped resolver is unknown. Any value we computed is partial
     // (e.g. `concat("https://", $UNKNOWN)`), so don't coerce or validate it and leave it unset
     if (this.isValueUnknownInShapeLoad) {
-      this.resolvedRawValue = undefined;
-      this.resolvedValue = undefined;
-      this.isValidated = true;
+      this.clearUnknownValue();
       return;
     }
 
@@ -1206,12 +1211,10 @@ export class ConfigItem {
 
     // shape mode: this type's coerce() is plugin code that did not run (the plugin was read from its
     // manifest), so the value is unknown, the same as a value from a skipped resolver
-    if (this.envGraph.mode === 'shape' && dataType._isCoerceUnavailable) {
+    if (this.envGraph.mode === 'shape' && dataType.coerceUnavailable) {
       this.envGraph.shapeSkipped.push({ kind: 'coerce', name: dataType.name, itemKey: this.key });
       this._coercionSkippedInShapeLoad = true;
-      this.resolvedRawValue = undefined;
-      this.resolvedValue = undefined;
-      this.isValidated = true;
+      this.clearUnknownValue();
       return;
     }
 

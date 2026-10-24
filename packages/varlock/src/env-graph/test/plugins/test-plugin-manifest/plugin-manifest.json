@@ -49,7 +49,7 @@
       "name": "manifestTestPort",
       "icon": "mdi:ethernet",
       "coercedType": "int",
-      "customCoerce": true
+      "coerceUnavailable": true
     }
   ],
   "resolvers": [
