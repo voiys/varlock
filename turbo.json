@@ -26,7 +26,7 @@
     "test:ci": {
       // plugin tests load the built bundle (dist/plugin.cjs), not src, so the package must be built first
       "dependsOn": ["^test:ci", "build"],
-      "inputs": ["package.json", "tsconfig.json", "tsconfig.*.json", "tsdown.config.ts", "tsdown.test.config.ts", "src/**", "test/**"]
+      "inputs": ["package.json", "tsconfig.json", "tsconfig.*.json", "tsdown.config.ts", "tsdown.test.config.ts", "src/**", "test/**", "scripts/**"]
     },
     "typecheck": {
       "dependsOn": ["^typecheck"],

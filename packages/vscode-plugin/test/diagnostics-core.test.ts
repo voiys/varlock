@@ -64,6 +64,33 @@ describe('diagnostics-core', () => {
     );
   });
 
+  it('flags @dynamic and @static together', () => {
+    const diagnostics = createDecoratorDiagnostics(getDecoratorOccurrences('# @dynamic @static', 0));
+
+    expect(diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+      '@dynamic and @static cannot be used together.',
+    );
+  });
+
+  describe('@proxy accepts repeated function calls but only one value form', () => {
+    const messages = (...lines: Array<string>) => createDecoratorDiagnostics(
+      lines.flatMap((line, index) => getDecoratorOccurrences(line, index)),
+    ).map((diagnostic) => diagnostic.message);
+
+    it('allows several function calls', () => {
+      expect(messages('# @proxy(domain=a.com) @proxy(domain=b.com)')).toEqual([]);
+    });
+
+    it('flags a repeated value form', () => {
+      expect(messages('# @proxy=passthrough @proxy=omit')).toEqual(['@proxy can only be used once in the same decorator block.']);
+    });
+
+    it('flags mixing the value form and function calls, in either order', () => {
+      expect(messages('# @proxy(domain=a.com) @proxy=omit')).toHaveLength(1);
+      expect(messages('# @proxy=omit @proxy(domain=a.com)')).toHaveLength(1);
+    });
+  });
+
   it('ignores decorator-like text inside regular comments', () => {
     const diagnostics = createDecoratorDiagnostics(
       getDecoratorOccurrences('# this @required mention is just documentation', 0),

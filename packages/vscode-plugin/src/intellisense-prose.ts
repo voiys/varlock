@@ -1,5 +1,11 @@
 /* eslint-disable no-template-curly-in-string */
 
+// Hand-written prose and snippets for the IntelliSense catalog. This is an overlay: which names exist
+// (and whether they are functions or deprecated) comes from varlock's own registries, via
+// scripts/generate-catalog.ts, which writes src/intellisense-catalog.ts. Entries here for names varlock
+// no longer registers are reported by `bun run check:catalog`. A name with no entry here falls back to
+// the description in its registry definition, or to a generic one.
+
 export type DecoratorInfo = {
   name: string;
   scope: 'root' | 'item';
@@ -7,6 +13,8 @@ export type DecoratorInfo = {
   documentation: string;
   insertText: string;
   isFunction?: boolean;
+  /** accepts `@name(...)` or `@name=value`; the function form can repeat, the value form cannot */
+  isFunctionOrValue?: boolean;
   deprecated?: string;
 };
 
@@ -62,6 +70,13 @@ export const ROOT_DECORATORS: Array<DecoratorInfo> = [
     summary: 'Controls whether items default to sensitive.',
     documentation: 'Valid values are `true`, `false`, or `inferFromPrefix(PUBLIC_)`.',
     insertText: '@defaultSensitive=${1|true,false,inferFromPrefix(PUBLIC_)|}',
+  },
+  {
+    name: 'defaultDynamic',
+    scope: 'root',
+    summary: 'Controls whether items default to dynamic (not replaced at build time) or static (eligible for build-time replacement).',
+    documentation: 'Valid values are `true`, `false`, or `inferFromSensitive` (the default: sensitive items are dynamic). Override per item with `@dynamic` / `@static`.',
+    insertText: '@defaultDynamic=${1|inferFromSensitive,true,false|}',
   },
   {
     name: 'disable',
@@ -158,6 +173,13 @@ export const ROOT_DECORATORS: Array<DecoratorInfo> = [
     isFunction: true,
   },
   {
+    name: 'cache',
+    scope: 'root',
+    summary: 'Sets the global cache mode for `cache()` and plugin caches.',
+    documentation: 'Valid values are `auto` (default), `memory`, `disk`, or `disabled`. Can be set with a function, for example `@cache=if(forEnv(dev), "disk")`.',
+    insertText: '@cache=${1|auto,memory,disk,disabled|}',
+  },
+  {
     name: 'redact',
     scope: 'root',
     summary: 'Controls whether sensitive values are redacted from logs and output.',
@@ -178,6 +200,27 @@ export const ROOT_DECORATORS: Array<DecoratorInfo> = [
     summary: 'Controls whether outgoing responses are scanned for secret leaks.',
     documentation: 'Boolean decorator that enables leak-prevention checks.',
     insertText: `@preventLeaks=${booleanChoiceSnippet()}`,
+  },
+  {
+    name: 'encryptInjectedEnv',
+    scope: 'root',
+    summary: 'Encrypts the env blob that integrations inject into server-side build output.',
+    documentation: 'Uses AES-256-GCM with the `_VARLOCK_ENV_KEY` environment variable. Can be set conditionally, for example `@encryptInjectedEnv=forEnv(prod)`.',
+    insertText: `@encryptInjectedEnv=${booleanChoiceSnippet()}`,
+  },
+  {
+    name: 'disableProcessEnvInjection',
+    scope: 'root',
+    summary: 'Stops varlock from injecting resolved values into `process.env`.',
+    documentation: 'Values are then only available through the `ENV` object. Must be a static `true` or `false`.',
+    insertText: `@disableProcessEnvInjection=${booleanChoiceSnippet()}`,
+  },
+  {
+    name: 'injectUndefinedAsEmpty',
+    scope: 'root',
+    summary: 'Injects items that resolve to `undefined` as empty strings, like most dotenv loaders.',
+    documentation: 'By default, unset items are left out of `process.env`. Must be a static `true` or `false`.',
+    insertText: `@injectUndefinedAsEmpty=${booleanChoiceSnippet()}`,
   },
   {
     name: 'setValuesBulk',
@@ -209,6 +252,21 @@ export const ROOT_DECORATORS: Array<DecoratorInfo> = [
     summary: 'Adds project-specific regex patterns to the audit code scanner.',
     documentation: 'Each pattern is a regex() call or quoted /.../ literal; the first capture group is the env key. Add fileTypes=[tf, yaml] to apply the patterns in that call only to those file extensions (and to scan file types the built-in scanner skips). Can be called multiple times - patterns are merged additively.',
     insertText: '@auditExtraPatterns(${1:regex(\'\')})',
+    isFunction: true,
+  },
+  {
+    name: 'proxyConfig',
+    scope: 'root',
+    summary: 'Configures proxy-wide credential proxy settings.',
+    documentation: 'Object value: `egress` (`permissive` | `strict`) controls requests that match no `@proxy` rule, and `reload` (`off` | `manual` | `auto`) controls live reload after a schema edit.',
+    insertText: '@proxyConfig={egress=${1|permissive,strict|}, reload=${2|auto,manual,off|}}',
+  },
+  {
+    name: 'proxy',
+    scope: 'root',
+    summary: 'Defines a detached credential proxy rule for a domain.',
+    documentation: 'Matches or blocks requests by `domain`, `path` and `method`. It injects nothing unless it lists `keys=[...]`. To inject a secret for one item, put `@proxy` on the item instead.',
+    insertText: '@proxy(domain="${1:api.example.com}")',
     isFunction: true,
   },
 ];
@@ -248,6 +306,20 @@ export const ITEM_DECORATORS: Array<DecoratorInfo> = [
     summary: 'Marks an item as used only internally by varlock, not by your application.',
     documentation: 'Internal items are still resolved and can be referenced by other items, but are excluded from injected env vars, the serialized graph blob, and generated types. Common use: a "secret zero" credential used only to fetch other secrets.',
     insertText: '@internal',
+  },
+  {
+    name: 'dynamic',
+    scope: 'item',
+    summary: 'Marks an item as dynamic: integrations will not replace it at build time.',
+    documentation: 'Use `@dynamic=boot` for a value bound at process start, such as a platform-assigned `PORT`. By default, sensitive items are dynamic.',
+    insertText: '@dynamic',
+  },
+  {
+    name: 'static',
+    scope: 'item',
+    summary: 'Marks an item as static: eligible for build-time replacement.',
+    documentation: 'Equivalent to `@dynamic=false`.',
+    insertText: '@static',
   },
   {
     name: 'type',
@@ -300,6 +372,28 @@ export const ITEM_DECORATORS: Array<DecoratorInfo> = [
     summary: 'Suppresses "unused in schema" warnings from varlock audit.',
     documentation: 'Use on items consumed only by external tools that won\'t appear in your application code.',
     insertText: '@auditIgnore',
+  },
+  {
+    name: 'deprecated',
+    scope: 'item',
+    summary: 'Marks an item as deprecated.',
+    documentation: 'The item still resolves and validates. Pass a message to say what to use instead, for example `@deprecated="Use NEW_API_URL instead"`.',
+    insertText: '@deprecated',
+  },
+  {
+    name: 'placeholder',
+    scope: 'item',
+    summary: 'Sets the placeholder an untrusted process sees instead of the real value.',
+    documentation: 'Only used when the item goes through the credential proxy. Set it when the derived placeholder would fail a client-side key format check.',
+    insertText: '@placeholder=${1:sk-proj-000000000000}',
+  },
+  {
+    name: 'proxy',
+    scope: 'item',
+    summary: 'Routes the item through the credential proxy, so child processes only see a placeholder.',
+    documentation: 'Function form `@proxy(domain=..., path=..., method=..., block=..., keys=[...])` injects the real value into matching requests only. Value form: `@proxy=passthrough` gives the child process the real value, and `@proxy=omit` withholds it entirely. The two forms cannot be mixed on one item.',
+    insertText: '@proxy(domain="${1:api.example.com}")',
+    isFunction: true,
   },
 ];
 
@@ -459,6 +553,17 @@ export const DATA_TYPES: Array<DataTypeInfo> = [
     documentation: 'Validates 32-character hexadecimal MD5 values.',
     insertText: 'md5',
   },
+  {
+    name: 'duration',
+    summary: 'Duration such as "1h", "30m" or "500ms". Bare numbers are milliseconds.',
+    documentation: 'Example: `@type=duration(output="seconds", min="1s")`. The value is converted to a number in the `output` unit (default `ms`).',
+    insertText: 'duration',
+    optionSnippets: [
+      { name: 'output', insertText: 'output=${1|ms,seconds,minutes,hours,days,weeks|}', documentation: 'Unit of the output number. Defaults to `ms`.' },
+      { name: 'min', insertText: 'min="${1:1s}"', documentation: 'Minimum duration, in any duration format.' },
+      { name: 'max', insertText: 'max="${1:1d}"', documentation: 'Maximum duration, in any duration format.' },
+    ],
+  },
 ];
 
 export const RESOLVERS: Array<ResolverInfo> = [
@@ -517,6 +622,24 @@ export const RESOLVERS: Array<ResolverInfo> = [
     insertText: 'if(${1:eq($$ENV, "prod")}, ${2:"https://api.example.com"}, ${3:"https://staging-api.example.com"})',
   },
   {
+    name: 'ifs',
+    summary: 'Returns the value of the first truthy condition, with an optional default.',
+    documentation: 'Arguments are `(condition, value)` pairs. An odd trailing argument is the default. Returns `undefined` when nothing matches and there is no default.',
+    insertText: 'ifs(${1:eq($$ENV, "production")}, ${2:"https://api.example.com"}, ${3:"http://localhost:3000"})',
+  },
+  {
+    name: 'varlock',
+    summary: 'Decrypts a locally encrypted value, or prompts for a secret to encrypt.',
+    documentation: 'Use `varlock(prompt)` to enter a secret once; varlock encrypts it and writes `varlock("local:...")` back to the file. Keep encrypted payloads in `.env.local`.',
+    insertText: 'varlock(${1:prompt})',
+  },
+  {
+    name: 'keychain',
+    summary: 'Reads a secret from the macOS Keychain.',
+    documentation: 'Takes a service name, or `service`, `account`, `keychain` and `field` options. `keychain(prompt)` opens a picker and writes back the reference.',
+    insertText: 'keychain(${1:service})',
+  },
+  {
     name: 'not',
     summary: 'Negates a value.',
     documentation: 'Falsy values become `true`, truthy values become `false`.',
@@ -559,7 +682,3 @@ export const RESOLVERS: Array<ResolverInfo> = [
     insertText: 'inferFromPrefix(${1:PUBLIC_})',
   },
 ];
-
-export const DECORATORS_BY_NAME = Object.fromEntries(
-  [...ROOT_DECORATORS, ...ITEM_DECORATORS].map((decorator) => [decorator.name, decorator]),
-) as Record<string, DecoratorInfo>;

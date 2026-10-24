@@ -1,4 +1,6 @@
-import type { DataTypeInfo, DecoratorInfo } from './intellisense-catalog';
+import {
+  type DataTypeInfo, type DecoratorInfo, ITEM_DECORATORS, ROOT_DECORATORS,
+} from './intellisense-catalog';
 
 type LineDocument = {
   lineCount: number;
@@ -13,6 +15,8 @@ const INCOMPATIBLE_DECORATORS = new Map<string, Set<string>>([
   ['optional', new Set(['required'])],
   ['sensitive', new Set(['public'])],
   ['public', new Set(['sensitive'])],
+  ['dynamic', new Set(['static'])],
+  ['static', new Set(['dynamic'])],
 ]);
 
 function stripInlineComment(value: string) {
@@ -111,6 +115,15 @@ export function isInHeader(document: LineDocument, lineNumber: number) {
 
 export function getCommentScope(document: LineDocument, lineNumber: number) {
   return isInHeader(document, lineNumber) ? 'header' : 'item';
+}
+
+/**
+ * Looks a decorator up by name, preferring the scope the cursor is in. Some names exist in both
+ * scopes with different meanings (`@proxy` is a detached rule in the header and an attached one on an item).
+ */
+export function findDecoratorInfo(name: string, scope: 'header' | 'item'): DecoratorInfo | undefined {
+  const [preferred, other] = scope === 'header' ? [ROOT_DECORATORS, ITEM_DECORATORS] : [ITEM_DECORATORS, ROOT_DECORATORS];
+  return preferred.find((decorator) => decorator.name === name) ?? other.find((decorator) => decorator.name === name);
 }
 
 export function getExistingDecoratorNames(

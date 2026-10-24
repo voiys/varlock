@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   filterAvailableDecorators,
+  findDecoratorInfo,
   getDecoratorCommentPrefix,
   getEnumValuesFromPrecedingComments,
   getExistingDecoratorNames,
@@ -180,5 +181,33 @@ describe('completion-core', () => {
   it('detects the active type option context', () => {
     expect(getTypeOptionDataType(DATA_TYPES, ' @required @type=email(norm')?.name).toBe('email');
     expect(getTypeOptionDataType(DATA_TYPES, ' @required @type=email')).toBeUndefined();
+  });
+});
+
+describe('findDecoratorInfo', () => {
+  it('prefers the entry for the scope the cursor is in', () => {
+    expect(findDecoratorInfo('proxy', 'header')?.scope).toBe('root');
+    expect(findDecoratorInfo('proxy', 'item')?.scope).toBe('item');
+  });
+
+  it('falls back to the other scope when the name only exists there', () => {
+    expect(findDecoratorInfo('required', 'header')?.scope).toBe('item');
+    expect(findDecoratorInfo('currentEnv', 'item')?.scope).toBe('root');
+  });
+
+  it('returns nothing for unknown names', () => {
+    expect(findDecoratorInfo('notADecorator', 'item')).toBeUndefined();
+  });
+});
+
+describe('filterAvailableDecorators with @dynamic and @static', () => {
+  it('hides @static once @dynamic is present, and the other way round', () => {
+    const names = (existing: Array<string>) => (
+      filterAvailableDecorators(ITEM_DECORATORS, new Set(existing)).map((d) => d.name)
+    );
+
+    expect(names(['dynamic'])).not.toContain('static');
+    expect(names(['static'])).not.toContain('dynamic');
+    expect(names([])).toEqual(expect.arrayContaining(['dynamic', 'static']));
   });
 });

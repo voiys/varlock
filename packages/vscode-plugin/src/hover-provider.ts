@@ -8,7 +8,7 @@ import {
 } from 'vscode';
 import { LANG_ID } from './constants';
 import { deindent } from './utils/deindent';
-import { DECORATORS_BY_NAME } from './intellisense-catalog';
+import { findDecoratorInfo, getCommentScope } from './completion-core';
 
 export function addHoverProvider(_context: ExtensionContext) {
   languages.registerHoverProvider(LANG_ID, {
@@ -23,7 +23,7 @@ export function addHoverProvider(_context: ExtensionContext) {
 
         if (hoveredText.startsWith('@')) {
           const decName = hoveredText.substring(1);
-          const dec = DECORATORS_BY_NAME[decName];
+          const dec = findDecoratorInfo(decName, getCommentScope(document, position.line));
           if (dec) {
             const mds = new MarkdownString();
             mds.supportThemeIcons = true;

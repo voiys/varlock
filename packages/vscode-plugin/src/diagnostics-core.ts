@@ -10,6 +10,7 @@ const MAX_MATCHES_PATTERN_LENGTH = 200;
 const INCOMPATIBLE_DECORATOR_PAIRS = [
   ['required', 'optional'],
   ['sensitive', 'public'],
+  ['dynamic', 'static'],
 ] as const;
 
 /**
@@ -279,6 +280,7 @@ export function getDecoratorOccurrences(lineText: string, lineNumber: number) {
 export function createDecoratorDiagnostics(occurrences: Array<DecoratorOccurrence>) {
   const diagnostics: Array<CoreDiagnostic> = [];
   const seenCounts = new Map<string, number>();
+  const seenValueForms = new Set<string>();
   const reportedRanges = new Set<string>();
 
   for (const occurrence of occurrences) {
@@ -286,7 +288,12 @@ export function createDecoratorDiagnostics(occurrences: Array<DecoratorOccurrenc
     seenCounts.set(occurrence.name, count + 1);
 
     const decorator = DECORATORS_BY_NAME[occurrence.name];
-    const isRepeatableFunction = decorator?.isFunction ?? occurrence.isFunctionCall;
+    let isRepeatableFunction = decorator?.isFunction ?? occurrence.isFunctionCall;
+    if (decorator?.isFunctionOrValue) {
+      // like @proxy: function calls can repeat, but the value form is single-use and cannot be mixed with calls
+      isRepeatableFunction = occurrence.isFunctionCall && !seenValueForms.has(occurrence.name);
+      if (!occurrence.isFunctionCall) seenValueForms.add(occurrence.name);
+    }
     if (!isRepeatableFunction && count >= 1) {
       diagnostics.push({
         line: occurrence.line,
