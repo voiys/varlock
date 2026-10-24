@@ -730,22 +730,25 @@ export const ForEnvResolver: typeof Resolver = createResolver({
  * Everything goes in the message rather than the tip, because warnings on a data source
  * (a root decorator's) are printed without their tip.
  */
-export function checkForEnvArgs(resolver: Resolver, envItem?: ConfigItem) {
+export function checkForEnvArgs(forEnvCalls: Array<Resolver>, envItem?: ConfigItem) {
   if (!envItem || envItem.hasComputedType) return;
   const members = envItem.dataType?.coercedType;
   if (typeof members !== 'object' || !('enum' in members)) return;
   const envNames = members.enum.map(String);
+  const envNameSet = new Set(envNames);
 
-  for (const arg of resolver.arrArgs ?? []) {
-    if (!(arg instanceof StaticValueResolver)) continue;
-    const argName = String(arg.staticValue);
-    if (envNames.includes(argName)) continue;
-    const suggestion = suggestClosest(argName, envNames);
-    resolver._errors.push(new SchemaError(
-      `${resolver.fnName}(): "${argName}" is not a possible value of ${envItem.key} (the @currentEnv item: ${envNames.join(', ')}), so it can never match`
-      + `${suggestion ? `. Did you mean "${suggestion}"?` : ''}`,
-      { isWarning: true },
-    ));
+  for (const resolver of forEnvCalls) {
+    for (const arg of resolver.arrArgs ?? []) {
+      if (!(arg instanceof StaticValueResolver)) continue;
+      const argName = String(arg.staticValue);
+      if (envNameSet.has(argName)) continue;
+      const suggestion = suggestClosest(argName, envNames);
+      resolver._errors.push(new SchemaError(
+        `${resolver.fnName}(): "${argName}" is not a possible value of ${envItem.key} (the @currentEnv item: ${envNames.join(', ')}), so it can never match`
+        + `${suggestion ? `. Did you mean "${suggestion}"?` : ''}`,
+        { isWarning: true },
+      ));
+    }
   }
 }
 

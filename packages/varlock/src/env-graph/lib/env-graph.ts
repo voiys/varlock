@@ -770,7 +770,15 @@ export class EnvGraph {
       }
     }
     this.checkBootDynamicItems();
-    this.forEnvCalls.forEach((envKey, call) => checkForEnvArgs(call, envKey ? this.configSchema[envKey] : undefined));
+    // grouped by @currentEnv item, so each item's env names are read once
+    const forEnvCallsByEnvKey = new Map<string, Array<Resolver>>();
+    this.forEnvCalls.forEach((envKey, call) => {
+      if (!envKey) return;
+      const calls = forEnvCallsByEnvKey.get(envKey);
+      if (calls) calls.push(call);
+      else forEnvCallsByEnvKey.set(envKey, [call]);
+    });
+    forEnvCallsByEnvKey.forEach((calls, envKey) => checkForEnvArgs(calls, this.configSchema[envKey]));
     this.forEnvCalls.clear();
 
     // now execute all root decorators

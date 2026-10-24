@@ -1,13 +1,10 @@
 import { describe, test, expect } from 'vitest';
 import outdent from 'outdent';
-import { EnvGraph, DirectoryDataSource } from '../index';
+import type { EnvGraph } from '../index';
+import { loadGraph } from './type-generation/helpers';
 
 async function load(files: Record<string, string>, opts?: { fallbackEnv?: string }) {
-  const g = new EnvGraph();
-  if (opts?.fallbackEnv) g.envFlagFallback = opts.fallbackEnv;
-  g.setVirtualImports('/virtual', files);
-  await g.setRootDataSource(new DirectoryDataSource('/virtual'));
-  await g.finishLoad();
+  const g = await loadGraph({ files, ...opts });
   await g.resolveEnvValues();
   return g;
 }
