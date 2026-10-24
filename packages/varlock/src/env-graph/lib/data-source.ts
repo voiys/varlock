@@ -871,6 +871,7 @@ export abstract class FileBasedDataSource extends EnvGraphDataSource {
   fullPath: string;
   fileName: string;
   rawContents?: string;
+  _preParsedFile?: ParsedEnvSpecFile;
 
   get typeLabel() {
     return (this.constructor as typeof FileBasedDataSource).format;
@@ -890,9 +891,15 @@ export abstract class FileBasedDataSource extends EnvGraphDataSource {
     fullPath: string,
     opts?: {
       overrideContents?: string;
+      /**
+       * an already parsed tree of `overrideContents` (e.g. from reparseEnvSpecIncremental), so loading skips the
+       * parse. Must be the tree of exactly that text
+       */
+      parsedFile?: ParsedEnvSpecFile;
     },
   ) {
     super();
+    this._preParsedFile = opts?.parsedFile;
 
     this.fullPath = fullPath;
     this.fileName = path.basename(fullPath);
@@ -964,8 +971,10 @@ export class DotEnvFileDataSource extends FileBasedDataSource {
   async _parseContents() {
     const rawContents = this.rawContents!;
 
+    const preParsed = this._preParsedFile;
+    this._preParsedFile = undefined;
     this.parsedFile = await tryCatch(
-      () => parseEnvSpecDotEnvFile(rawContents),
+      () => preParsed ?? parseEnvSpecDotEnvFile(rawContents),
       (error) => {
         const parseError = new ParseError(`Parse error: ${error.message}`, {
           location: {

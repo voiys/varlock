@@ -3,6 +3,7 @@ import { loadVarlockEnvGraph } from './lib/load-graph';
 import { initVarlockEnv } from './runtime/env';
 import { checkBunVersion } from './lib/check-bun-version';
 
+import { parseEnvSpecDotEnvFile, reparseEnvSpecIncremental } from '@env-spec/parser';
 // Import env-graph components for internal API
 import {
   EnvGraph,
@@ -54,6 +55,9 @@ export function getBuildTimeReplacements(opts?: {
 
 // Internal API for direct env graph manipulation
 export const internal = {
+  // parser, for editors: a full parse, and a reparse of only what an edit touched
+  parseEnvSpecDotEnvFile,
+  reparseEnvSpecIncremental,
   // Core classes
   EnvGraph,
   DotEnvFileDataSource,

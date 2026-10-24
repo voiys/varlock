@@ -14,16 +14,19 @@ import {
 }}
 
 EnvSpecFile =
-  contents:(
-    ConfigItem
-    / Divider
-    / CommentBlock
-    / _ "\n" { return new ParsedEnvSpecBlankLine({ _location: location() }); }
-    / __ !. { return new ParsedEnvSpecBlankLine({ _location: location() }); }
-  )*
+  contents:EnvSpecNode*
   {
     return new ParsedEnvSpecFile(contents)
   }
+
+// one top-level node; also a start rule, so an editor can reparse only the nodes an edit touched
+// (see reparseEnvSpecIncremental)
+EnvSpecNode =
+  ConfigItem
+  / Divider
+  / CommentBlock
+  / _ "\n" { return new ParsedEnvSpecBlankLine({ _location: location() }); }
+  / __ !. { return new ParsedEnvSpecBlankLine({ _location: location() }); }
 
 ConfigItem =
   preComments:(@(DecoratorComment / Comment) "\n")*
