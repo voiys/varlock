@@ -16,6 +16,16 @@ import { enforceProxySchemaFingerprint } from '../cli/helpers/proxy-schema-finge
 
 const debug = createDebug('varlock:load');
 
+/**
+ * Built-in resolvers that varlock registers on every graph it loads, on top of the ones an
+ * `EnvGraph` registers itself. Tooling that needs the full set of built-ins (like the
+ * VS Code extension's IntelliSense catalog) calls this on a bare `EnvGraph`.
+ */
+export function registerLoaderResolvers(g: EnvGraph) {
+  g.registerResolver(VarlockResolver);
+  g.registerResolver(KeychainResolver);
+}
+
 function getGraphEnvOverridesFromRuntimeEnv() {
   // Select from the pre-injection process.env snapshot, not the live one: the
   // runtime auto-init re-injects the parent blob's resolved values into
@@ -88,8 +98,7 @@ function loadFromPaths(
     clearCache: config.clearCache,
     skipCache: config.skipCache,
     afterInit: async (g) => {
-      g.registerResolver(VarlockResolver);
-      g.registerResolver(KeychainResolver);
+      registerLoaderResolvers(g);
       if (config.proxyResolutionView) {
         g.proxyResolutionView = config.proxyResolutionView;
       }
@@ -177,8 +186,7 @@ export async function loadVarlockEnvGraph(opts?: {
       clearCache: opts?.clearCache,
       skipCache: opts?.skipCache,
       afterInit: async (g) => {
-        g.registerResolver(VarlockResolver);
-        g.registerResolver(KeychainResolver);
+        registerLoaderResolvers(g);
         if (proxyResolutionView) {
           g.proxyResolutionView = proxyResolutionView;
         }

@@ -1,5 +1,5 @@
 import { checkForConfigErrors, checkForNoEnvFiles, checkForSchemaErrors } from './cli/helpers/error-checks';
-import { loadVarlockEnvGraph } from './lib/load-graph';
+import { loadVarlockEnvGraph, registerLoaderResolvers } from './lib/load-graph';
 import { initVarlockEnv } from './runtime/env';
 import { checkBunVersion } from './lib/check-bun-version';
 
@@ -70,6 +70,7 @@ export const internal = {
 
   // Varlock-specific utilities
   loadVarlockEnvGraph,
+  registerLoaderResolvers,
   // must run before resolveEnvValues() - a source that failed to load leaves the graph
   // half-built, and checkForConfigErrors() alone never reports source-level parse errors
   checkForSchemaErrors,
