@@ -131,7 +131,7 @@ ENABLE_X=true
 
 By default, `@import()` will cause a loading error if the specified file or directory does not exist. You can use the `allowMissing` parameter to make an import optional - if the file or directory doesn't exist, it will be silently skipped without causing an error.
 
-The `allowMissing` parameter accepts a boolean value (defaults to `false`). It can be combined with partial imports and the `enabled` parameter.
+The `allowMissing` parameter accepts a boolean value (defaults to `false`). It can be combined with partial imports and the `enabled` parameter. There is no `required` or `optional` parameter; varlock reports an unknown parameter as an error and points you to `allowMissing=true`.
 
 **Example:**
 ```env-spec title=".env.schema"

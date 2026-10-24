@@ -1,3 +1,4 @@
+import { levenshtein } from '../../lib/closest-match';
 import { CliExitError } from './exit-error';
 import { fmt } from './pretty-format';
 
@@ -30,28 +31,11 @@ type CommandNotFoundError = {
 const ANONYMOUS_COMMAND_NAME = '(anonymous)';
 
 /**
- * Levenshtein distance, kept dependency-free for the "did you mean" suggestion.
+ * Levenshtein distance, re-exported from the shared helper.
  *
  * @internal exported for unit tests
  */
-export function levenshtein(a: string, b: string): number {
-  const rows = a.length + 1;
-  const cols = b.length + 1;
-  const dist: Array<Array<number>> = Array.from({ length: rows }, () => new Array(cols).fill(0));
-  for (let i = 0; i < rows; i++) dist[i][0] = i;
-  for (let j = 0; j < cols; j++) dist[0][j] = j;
-  for (let i = 1; i < rows; i++) {
-    for (let j = 1; j < cols; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dist[i][j] = Math.min(
-        dist[i - 1][j] + 1,
-        dist[i][j - 1] + 1,
-        dist[i - 1][j - 1] + cost,
-      );
-    }
-  }
-  return dist[a.length][b.length];
-}
+export { levenshtein };
 
 const stripDashes = (value: string) => value.replace(/^--?/, '');
 

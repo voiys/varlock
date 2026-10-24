@@ -15,6 +15,7 @@ import { ResolutionError, SchemaError, type VarlockError } from './errors';
 import type { EnvGraph } from './env-graph';
 import { parseKeyFilterArgs, applyKeyFilter, type KeyFilter } from './key-filter';
 import { parseDuration } from '../../lib/duration';
+import { findClosestName } from '../../lib/closest-match';
 import {
   BUILT_IN_TRANSFORM_SCHEME_SPECS, PROXY_APPROVAL_EACH_VALUES, REMOVED_PROXY_RULE_OPTIONS,
   parseProxySubstitutionTarget, validateProxyTransformConfig,
@@ -109,7 +110,9 @@ export abstract class DecoratorInstance {
             throw new SchemaError(`@${this.name} is a root decorator and cannot be attached to a config item - it must be in the file header (before the first config item)`);
           }
         }
-        throw new SchemaError(`Unknown decorator: @${this.name}`);
+        throw new SchemaError(`Unknown decorator: @${this.name}`, {
+          tip: this.getUnknownDecoratorTips(Object.keys(decRegistry)),
+        });
       }
 
 
@@ -204,6 +207,24 @@ export abstract class DecoratorInstance {
       this._errors.push(e instanceof SchemaError ? e : new SchemaError(e as Error));
     }
   }
+  private getUnknownDecoratorTips(knownNames: Array<string>): Array<string> {
+    const tips: Array<string> = [];
+    const nameLower = this.name.toLowerCase();
+    if (!this.isRootDecorator && (nameLower === 'description' || nameLower === 'desc')) {
+      tips.push('An item\'s description is not a decorator: it is taken from the plain comment lines directly above the item (lines that do not start with @).');
+    } else if (!this.isRootDecorator && nameLower === 'default') {
+      tips.push('A default is not a decorator: set it as the item\'s value in the schema (ITEM=default-value).');
+    } else {
+      const suggestion = findClosestName(this.name, knownNames);
+      if (suggestion) tips.push(`Did you mean @${suggestion}?`);
+    }
+    tips.push(
+      'Unknown decorators are errors, not ignored. If it comes from a plugin, load the plugin with @plugin().',
+      `A comment line that starts with @ is read as decorators. To keep @${this.name} as plain text, put it on a comment line that does not start with @ (for example \`# note: @${this.name}\`).`,
+    );
+    return tips;
+  }
+
   async execute() {
     await this.decoratorDef!.execute?.(this.processedData);
   }
@@ -663,6 +684,33 @@ function redactRootDecorator(name: string, extra: Partial<RootDecoratorDef>): Ro
 }
 
 // root decorators
+/**
+ * Reject named args a decorator does not support, so a typo or an option borrowed from
+ * somewhere else fails with a clear message instead of being silently ignored.
+ * `hints` maps a name people commonly try to a tip pointing at the real option.
+ */
+function assertKnownOptions(
+  decoratorName: string,
+  objArgs: Record<string, unknown> | undefined,
+  validOptions: Array<string>,
+  hints?: Record<string, string>,
+): void {
+  for (const key of Object.keys(objArgs ?? {})) {
+    if (validOptions.includes(key)) continue;
+    const suggestion = findClosestName(key, validOptions);
+    throw new SchemaError(
+      `@${decoratorName}: unknown option "${key}". Valid options: ${validOptions.join(', ')}`,
+      { tip: hints?.[key] ?? (suggestion ? `Did you mean ${suggestion}?` : undefined) },
+    );
+  }
+}
+
+const IMPORT_OPTIONS = ['enabled', 'allowMissing', 'pick', 'omit'];
+const IMPORT_OPTION_HINTS: Record<string, string> = {
+  required: 'Imports are required by default. To skip the import when the path does not exist, use allowMissing=true',
+  optional: 'To skip the import when the path does not exist, use allowMissing=true',
+};
+
 export const builtInRootDecorators: Array<RootDecoratorDef<any>> = [
   {
     name: 'envFlag',
@@ -720,6 +768,7 @@ export const builtInRootDecorators: Array<RootDecoratorDef<any>> = [
       if (decVal.arrArgs.some((a) => !a.isStatic)) {
         throw new Error('@import decorator cannot use any dynamic values - all args must be static');
       }
+      assertKnownOptions('import', decVal.objArgs, IMPORT_OPTIONS, IMPORT_OPTION_HINTS);
       // The 'enabled' named parameter is allowed and can be dynamic
     },
   },
@@ -836,12 +885,7 @@ export const builtInRootDecorators: Array<RootDecoratorDef<any>> = [
         );
       }
       if (argsVal.objArgs) {
-        const validOptions = new Set(['format', 'createMissing', 'enabled', 'pick', 'omit']);
-        for (const key of Object.keys(argsVal.objArgs)) {
-          if (!validOptions.has(key)) {
-            throw new SchemaError(`@setValuesBulk: unknown option "${key}". Valid options: format, createMissing, enabled, pick, omit`);
-          }
-        }
+        assertKnownOptions('setValuesBulk', argsVal.objArgs, ['format', 'createMissing', 'enabled', 'pick', 'omit']);
         // validate format option if static
         const formatResolver = argsVal.objArgs.format;
         if (formatResolver?.isStatic) {

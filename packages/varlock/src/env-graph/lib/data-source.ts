@@ -517,6 +517,10 @@ export abstract class EnvGraphDataSource {
         try {
           // Process the import decorator to identify dependencies
           await importDec.process();
+          // the decorator itself is invalid (e.g. an unknown option such as `required=false`), and
+          // that error is already reported. Stop here so a follow-on "path does not exist" error
+          // does not hide it.
+          if (importDec.schemaErrors.some((e) => !e.isWarning)) return;
 
           // Early resolve any dependencies in the enabled parameter
           if (importDec.decValueResolver?.objArgs?.enabled) {
@@ -956,14 +960,29 @@ export class DotEnvFileDataSource extends FileBasedDataSource {
     this.parsedFile = await tryCatch(
       () => parseEnvSpecDotEnvFile(rawContents),
       (error) => {
-        const parseError = new ParseError(`Parse error: ${error.message}`, {
-          location: {
-            id: this.fullPath,
-            lineNumber: error.location.start.line,
-            colNumber: error.location.start.column,
-            lineStr: rawContents.split('\n')[error.location.start.line - 1],
-          },
-        });
+        const lineNumber = error.location.start.line;
+        const lineStr = rawContents.split('\n')[lineNumber - 1];
+        const location = {
+          id: this.fullPath,
+          lineNumber,
+          colNumber: error.location.start.column,
+          lineStr,
+        };
+        // a comment that starts with `@` is always read as decorators, so prose such as
+        // `# @secret(exec(./script.sh NAME)) entries ...` fails deep inside the decorator grammar.
+        // Say why, and how to write it either way, instead of only echoing the parser's expectations.
+        const parseError = /^\s*#\s*@/.test(lineStr ?? '')
+          ? new ParseError(
+            `Parse error on line ${lineNumber}: this comment starts with @, so it is read as a decorator, but it could not be parsed (${error.message})`,
+            {
+              location,
+              tip: [
+                'If it is a decorator, check its syntax: a function argument that contains spaces must be quoted, for example exec("./script.sh NAME").',
+                'If it is plain text, reword it so the comment does not start with @ (for example `# Example: @secret(...)`).',
+              ],
+            },
+          )
+          : new ParseError(`Parse error: ${error.message}`, { location });
         // TODO: figure out cause vs passing in as `err` param
         parseError.cause = error;
         this._errors.push(parseError);

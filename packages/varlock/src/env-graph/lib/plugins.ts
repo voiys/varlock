@@ -873,9 +873,17 @@ export async function processPluginInstallDecorators(dataSource: EnvGraphDataSou
               const packageJson = JSON.parse(packageJsonString);
               const packageVersion = packageJson.version;
               if (versionDescriptor && !semverSatisfies(packageVersion, versionDescriptor)) {
-                throw new SchemaError(`Installed plugin "${moduleName}" version "${packageVersion}" does not satisfy requested version "${versionDescriptor}"`, {
-                  location: getErrorLocation(dataSource, pluginDecorator),
-                });
+                // the copy found may be hoisted to a parent node_modules (monorepos), so say where it is
+                throw new SchemaError(
+                  `Plugin "${moduleName}" version mismatch: @plugin() asks for "${versionDescriptor}", but the installed version is "${packageVersion}" (found in ${candidatePluginPath})`,
+                  {
+                    location: getErrorLocation(dataSource, pluginDecorator),
+                    tip: [
+                      `To use the installed version, change the pin to @plugin(${moduleName}@${packageVersion}), or drop the version to use whatever is installed.`,
+                      `To keep the pin, install a matching version: set "${moduleName}": "${versionDescriptor}" in package.json and reinstall.`,
+                    ],
+                  },
+                );
               }
               pluginSrcPath = candidatePluginPath;
               break;

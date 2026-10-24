@@ -73,6 +73,8 @@ Multiple comment lines _directly_ preceding an item will be attached to that ite
 Any comment block before the first item is still part of the document header until it is ended by a blank line, a divider, or the end of the file.
 Comment lines can either contain regular comments or [item decorators](/reference/item-decorators). Standalone comments only count as decorator comments when the comment content starts with `@`.
 
+An item's description is taken from the plain comment lines above it; there is no `@description` decorator. Varlock does not ignore decorators it does not know: an unknown `@name` is an error, with a suggestion when it is close to a real one. To mention `@something` as text, put it on a comment line that does not start with `@` (for example `# note: @something`). The same applies to header comments: a line like `# @secret(exec(./script.sh NAME)) entries ...` is read as a decorator and fails to parse, while `# Example: @secret(...)` stays a comment.
+
 ```env-spec
 # description of item can be multiple lines
 # this @decorator will be ignored because the line does not start with @

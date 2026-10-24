@@ -35,7 +35,7 @@ In a JavaScript project (where a `package.json` file is present), you must insta
 # @plugin(@varlock/a-plugin) # uses the locally installed version
 ```
 
-You can optionally add a version specifier to validate that the installed version satisfies a [semver range](https://devhints.io/semver), but the local version is always what gets loaded. If the installed version doesn't match the specified range, an error will be thrown.
+You can optionally add a version specifier to validate that the installed version satisfies a [semver range](https://devhints.io/semver), but the local version is always what gets loaded. If the installed version doesn't match the specified range, an error will be thrown. The error shows both versions and where the installed copy was found (in a monorepo it may be hoisted to a parent `node_modules`). To fix it, either change or remove the version in `@plugin()`, or install a version that matches it in your `package.json`.
 
 ```env-spec title=".env.schema"
 # @plugin(@varlock/a-plugin@^2.3.4) # validates installed version is >=2.3.4 <3.0.0

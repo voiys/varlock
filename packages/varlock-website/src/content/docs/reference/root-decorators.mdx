@@ -186,6 +186,8 @@ The optional `enabled` parameter allows conditional imports based on boolean exp
 
 The optional `allowMissing` parameter makes the import optional - if set to `true`, the import will be silently skipped if the file or directory doesn't exist instead of causing a loading error. It defaults to `false` if not specified.
 
+Any other named arg is an error, so a typo (`allowmissing=true`) or an option `@import` does not have (`required=false`) is reported instead of being ignored. There is no `required` option: imports are required unless `allowMissing=true` is set.
+
 **Filtering items:** by default every item from the imported file(s) is brought in. Use `pick` to import only an allowlist, or `omit` to import everything except a denylist. You can't use both in one import. Entries are selectors (same language as [`--filter`](/reference/cli-commands/#filtering-items)): key names, globs (`*`, `?`), `#tagname` for items tagged with [`@tag()`](/reference/item-decorators/#tag) in the imported file, and `!selector` to exclude matches. Decorator selectors (`@sensitive`, ...) are not supported here, since imports are filtered before values resolve. Across nested imports, filters intersect: an item must pass every filter in the chain.
 
 :::caution[Positional keys are deprecated]
