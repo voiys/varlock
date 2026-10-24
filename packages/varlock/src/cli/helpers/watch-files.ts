@@ -42,7 +42,7 @@ export type FileWatchRunner = {
  * secret manager serves a value through, never triggers a run: reading it can itself change it.
  *
  * `run` should handle its own errors and report them through `ok: false`. If it throws anyway, the
- * error goes to `onError` and the watcher keeps going.
+ * error goes to `onError` (by default, logged with `console.error`) and the watcher keeps going.
  */
 export function watchFiles(opts: {
   run: () => Promise<WatchRunResult>,
@@ -52,6 +52,7 @@ export function watchFiles(opts: {
   onError?: (err: unknown) => void,
 }): FileWatchRunner {
   const debounceMs = opts.debounceMs ?? 150;
+  const onError = opts.onError ?? ((err: unknown) => console.error(err));
   let stopped = false;
   const entryFiles = (opts.entryFiles ?? []).map((f) => path.resolve(f));
   let knownFiles = new Set<string>(entryFiles);
@@ -60,8 +61,6 @@ export function watchFiles(opts: {
   let running = false;
   let rerun = false;
   let idleWaiters: Array<() => void> = [];
-  // set below, once the run loop exists: the directory watchers and the run loop need each other
-  const hooks: { onChange?: () => void } = {};
 
   const closeWatcher = (dir: string) => {
     watchers.get(dir)?.close();
@@ -74,7 +73,9 @@ export function watchFiles(opts: {
         // some platforms omit the filename: treat that as "something changed"
         if (name && !knownFiles.has(path.join(dir, name)) && !name.startsWith('.env')) return;
         if (name && isNonRegularFile(path.join(dir, name))) return;
-        hooks.onChange?.();
+        // the watchers and the run loop call each other; onChange is defined before any event can fire
+        // eslint-disable-next-line no-use-before-define
+        onChange();
       });
       // a watched directory that gets deleted emits an error: drop it, and the next run re-adds it
       watcher.on('error', () => closeWatcher(dir));
@@ -107,7 +108,7 @@ export function watchFiles(opts: {
           const reported = result.ok ? files : [...knownFiles, ...files];
           knownFiles = new Set([...entryFiles, ...reported]);
         } catch (err) {
-          opts.onError?.(err);
+          onError(err);
         }
         syncWatchers();
       } while (rerun && !stopped);
@@ -120,10 +121,10 @@ export function watchFiles(opts: {
   };
 
   const startLoop = () => {
-    loop().catch((err) => opts.onError?.(err));
+    loop().catch(onError);
   };
 
-  hooks.onChange = () => {
+  const onChange = () => {
     if (stopped) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {

@@ -1,5 +1,5 @@
 import {
-  describe, test, expect, beforeEach, afterEach,
+  describe, test, expect, vi, beforeEach, afterEach,
 } from 'vitest';
 import { setTimeout as sleep } from 'node:timers/promises';
 import fs from 'node:fs';
@@ -23,13 +23,9 @@ afterEach(() => {
 });
 
 const file = (name: string) => path.join(dir, name);
-const waitFor = async (check: () => boolean, ms = 5000) => {
-  const start = Date.now();
-  while (!check()) {
-    if (Date.now() - start > ms) throw new Error('timed out waiting for condition');
-    await sleep(20);
-  }
-};
+const waitFor = (check: () => boolean) => vi.waitFor(() => {
+  if (!check()) throw new Error('timed out waiting for condition');
+}, { timeout: 5000, interval: 20 });
 
 /**
  * Start a watcher and wait until it is quiet. macOS reports a few events from just before a watch

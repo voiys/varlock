@@ -87,14 +87,18 @@ export function startCodegenWatch(opts: {
   log?: (msg: string) => void,
 }): FileWatchRunner {
   const log = opts.log ?? console.log;
-  const entryDirs = (opts.entryFilePaths?.length ? opts.entryFilePaths : [process.cwd()]).map((p) => {
+  // an entry file is watched through its directory, and also counts as a known file from the start
+  const entryDirs: Array<string> = [];
+  const entryFiles: Array<string> = [];
+  for (const p of opts.entryFilePaths?.length ? opts.entryFilePaths : [process.cwd()]) {
     const resolved = path.resolve(p);
-    return fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
-  });
-
-  const entryFiles = (opts.entryFilePaths ?? [])
-    .map((p) => path.resolve(p))
-    .filter((p) => fs.existsSync(p) && fs.statSync(p).isFile());
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+      entryFiles.push(resolved);
+      entryDirs.push(path.dirname(resolved));
+    } else {
+      entryDirs.push(resolved);
+    }
+  }
 
   const waiting = ansis.yellow('Waiting for the next change...');
   let isFirstRun = true;

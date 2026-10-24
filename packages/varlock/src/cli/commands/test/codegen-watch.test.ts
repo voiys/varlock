@@ -32,13 +32,9 @@ afterEach(() => {
 const file = (name: string) => path.join(dir, name);
 const write = (name: string, contents: string) => fs.writeFileSync(file(name), contents);
 const output = () => (fs.existsSync(file('env.d.ts')) ? fs.readFileSync(file('env.d.ts'), 'utf-8') : '');
-const waitFor = async (check: () => boolean, ms = 5000) => {
-  const start = Date.now();
-  while (!check()) {
-    if (Date.now() - start > ms) throw new Error(`timed out waiting for condition. output so far:\n${output()}\nlogs: ${logs.join(' | ')}`);
-    await sleep(20);
-  }
-};
+const waitFor = (check: () => boolean) => vi.waitFor(() => {
+  if (!check()) throw new Error(`timed out waiting for condition. output so far:\n${output()}\nlogs: ${logs.join(' | ')}`);
+}, { timeout: 5000, interval: 20 });
 const start = async (entry = dir) => {
   watcher = startCodegenWatch({ entryFilePaths: [entry], debounceMs: 50, log: (msg) => logs.push(msg) });
   await watcher.idle();
