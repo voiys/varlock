@@ -23,6 +23,7 @@ import {
 } from './resolver';
 import { buildTypeSpecPlan, coercedTypesMatch, type TypeSpecPlan } from './type-decorator';
 import { ItemDecoratorInstance } from './decorators';
+import { GlobPattern } from './glob';
 
 export type ConfigItemDef = {
   description?: string;
@@ -1111,6 +1112,9 @@ export class ConfigItem {
 
     if (this.resolvedRawValue instanceof RegExp) {
       this.resolutionError = new ResolutionError('Regex values are meant to be used within function args (e.g., remap()), not as a final resolved value');
+    }
+    if (this.resolvedRawValue instanceof GlobPattern) {
+      this.resolutionError = new ResolutionError('glob() values are meant to be used as remap() match values, not as a final resolved value');
     }
 
     // bail if we have an resolution error

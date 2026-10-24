@@ -25,6 +25,8 @@ import { DecoratorInstance } from './decorators';
 import { getErrorLocation } from './error-location';
 import { isBuiltinVar } from './builtin-vars';
 import { REGEX_LIKE_STRING, parseRegexLikeString } from './regex-like-string';
+import { patternParts, remapRegexDeprecationWarning } from './regex-deprecation';
+import { GlobPattern } from './glob';
 
 const execAsync = promisify(exec);
 
@@ -33,33 +35,6 @@ export { parseRegexLikeString };
 export function isRegexLikeString(str: unknown): str is string {
   return typeof str === 'string' && REGEX_LIKE_STRING.test(str);
 }
-/** quote a pattern for an env-spec example - only `"` needs escaping inside a double-quoted value */
-const quoteForExample = (str: string) => `"${str.replaceAll('"', '\\"')}"`;
-
-/**
- * Passing a pattern as a STRING - a `/pattern/flags` string anywhere a regex is read, or a
- * plain string on a `matches` option - is deprecated in favour of `regex()`, and goes away
- * in a future major. Emitted wherever such a string is still interpreted, so every schema
- * that relies on it hears about it before the behavior changes. The tip shows the exact
- * `regex()` call for the string it found.
- */
-export function deprecatedRegexStringWarning(str: string, context?: string) {
-  const literal = str.match(REGEX_LIKE_STRING);
-  const replacement = literal
-    ? `regex(${quoteForExample(literal[1])}${literal[2] ? `, ${quoteForExample(literal[2])}` : ''})`
-    : `regex(${quoteForExample(str)})`;
-  return new SchemaError(
-    `${context ? `${context} - ` : ''}string patterns are deprecated, use regex() instead`,
-    {
-      isWarning: true,
-      tip: [
-        `write it as ${replacement}`,
-        'this still works for now, but a future major version will stop reading a string as a regex',
-      ],
-    },
-  );
-}
-
 /**
  * `regex()` takes the pattern SOURCE, so a `/.../`-wrapped argument is almost always a JS
  * literal pasted in whole - and it would quietly compile to a pattern matching the slashes
@@ -85,6 +60,7 @@ export function assertUnwrappedRegexSource(pattern: string, context?: string) {
 export type ResolvedValue = undefined
   | string | number | boolean
   | RegExp // regex is only used internally as function args, not as a final resolved value
+  | GlobPattern // same for glob()
   // TODO: will probably want to re-enable object/array values
   | { [key: string]: ResolvedValue }
   | Array<ResolvedValue>;
@@ -127,7 +103,8 @@ export class Resolver {
   protected warnDynamicRegexString(source: Resolver, str: string) {
     // eslint-disable-next-line no-use-before-define
     if (source instanceof StaticValueResolver) return;
-    const warning = deprecatedRegexStringWarning(str);
+    const warning = remapRegexDeprecationWarning([{ label: str, parts: patternParts(str) }]);
+    warning.message = `${this.def.name}(): ${warning.message}`;
     if (this._errors.some((e) => e.message === warning.message && e.tip === warning.tip)) return;
     this._errors.push(warning);
   }
@@ -341,7 +318,7 @@ export class StaticValueResolver extends Resolver {
   get staticValue() { return this._staticValue; }
   constructor(readonly _staticValue: ResolvedValue) {
     super([]);
-    if (_staticValue !== undefined && !(_staticValue instanceof RegExp)) {
+    if (_staticValue !== undefined && !(_staticValue instanceof RegExp) && !(_staticValue instanceof GlobPattern)) {
       this.inferredType = typeof _staticValue;
     }
   }
@@ -588,6 +565,30 @@ export const RegexResolver: typeof Resolver = createResolver({
   },
 });
 
+// glob() is a match value for remap(): `*` matches any run of characters, `?` one character.
+// Like regex() it is only used as a function arg, never as a final resolved value.
+export const GlobResolver: typeof Resolver = createResolver({
+  name: 'glob',
+  icon: 'mdi:asterisk',
+  argsSchema: {
+    type: 'array',
+    arrayExactLength: 1,
+  },
+  process() {
+    if (!(this.arrArgs?.[0] instanceof StaticValueResolver)) {
+      throw new SchemaError('expects a static pattern passed in');
+    }
+    const pattern = this.arrArgs[0].staticValue;
+    if (typeof pattern !== 'string') {
+      throw new SchemaError('expects a string');
+    }
+    return new GlobPattern(pattern);
+  },
+  async resolve(glob) {
+    return glob;
+  },
+});
+
 export const RemapResolver: typeof Resolver = createResolver({
   name: 'remap',
   icon: 'codicon:replace',
@@ -622,10 +623,25 @@ export const RemapResolver: typeof Resolver = createResolver({
     const matchResolvers = isLegacyKeyValMode
       ? Object.values(this.objArgs!)
       : (this.arrArgs ?? []).filter((_arg, i) => i >= 1 && (i - 1) % 2 === 0);
-    const regexString = matchResolvers.find((r) => (
-      r instanceof StaticValueResolver && isRegexLikeString(r.staticValue)
-    )) as StaticValueResolver | undefined;
-    if (regexString) this._errors.push(deprecatedRegexStringWarning(regexString.staticValue as string));
+    // regex match values (`regex()` calls and `/.../` strings) are deprecated in favour of glob()
+    const regexMatches: Parameters<typeof remapRegexDeprecationWarning>[0] = [];
+    for (const r of matchResolvers) {
+      if (r instanceof StaticValueResolver && isRegexLikeString(r.staticValue)) {
+        regexMatches.push({ label: r.staticValue, parts: patternParts(r.staticValue) });
+      } else if (r.fnName === 'regex') {
+        const [sourceArg, flagsArg] = r.arrArgs ?? [];
+        const source = sourceArg?.staticValue;
+        const flags = flagsArg?.staticValue;
+        if (typeof source === 'string') {
+          const args = [JSON.stringify(source), ...typeof flags === 'string' ? [JSON.stringify(flags)] : []];
+          regexMatches.push({
+            label: `regex(${args.join(', ')})`,
+            parts: { source, flags: typeof flags === 'string' ? flags : '' },
+          });
+        }
+      }
+    }
+    if (regexMatches.length) this._errors.push(remapRegexDeprecationWarning(regexMatches));
     return { isLegacyKeyValMode };
   },
   async resolve({ isLegacyKeyValMode }) {
@@ -635,8 +651,8 @@ export const RemapResolver: typeof Resolver = createResolver({
       // legacy key=value mode: key is the result, value is what to match against
       for (const [remappedVal, matchValResolver] of Object.entries(this.objArgs!)) {
         const matchVal = await matchValResolver.resolve();
-        // support regex-like unquoted strings (e.g., /pattern/flags) and regex() fn
-        if (matchVal instanceof RegExp) {
+        // support glob() and (deprecated) regex() / regex-like unquoted strings (e.g., /pattern/flags)
+        if (matchVal instanceof RegExp || matchVal instanceof GlobPattern) {
           if (originalValue !== undefined && matchVal.test(String(originalValue))) return remappedVal;
           continue;
         }
@@ -658,8 +674,8 @@ export const RemapResolver: typeof Resolver = createResolver({
     // process only complete pairs, leaving a potential trailing default unprocessed
     for (let i = 0; i + 1 < remainingArgs.length; i += 2) {
       const matchVal = await remainingArgs[i].resolve();
-      // support regex-like unquoted strings (e.g., /pattern/flags) and regex() fn
-      if (matchVal instanceof RegExp) {
+      // support glob() and (deprecated) regex() / regex-like unquoted strings (e.g., /pattern/flags)
+      if (matchVal instanceof RegExp || matchVal instanceof GlobPattern) {
         if (originalValue !== undefined && matchVal.test(String(originalValue))) return remainingArgs[i + 1].resolve();
         continue;
       }
@@ -1378,6 +1394,7 @@ export const BaseResolvers: Array<ResolverChildClass> = [
   IsEmptyResolver,
   DomainFromUrlResolver,
   RegexResolver,
+  GlobResolver,
   InferFromPrefixResolver,
 ];
 

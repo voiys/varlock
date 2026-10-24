@@ -1217,7 +1217,9 @@ describe('string data type - matches option', () => {
       BAD_SHA=nope
     `);
     expect(g.configSchema.GOOD_SHA.isValid).toBe(true);
-    expect(g.configSchema.GOOD_SHA.errors).toHaveLength(0);
+    // regex() still works, with a deprecation warning
+    expect(g.configSchema.GOOD_SHA.errors).toHaveLength(1);
+    expect(g.configSchema.GOOD_SHA.errors[0].isWarning).toBe(true);
     expect(g.configSchema.BAD_SHA.isValid).toBe(false);
   });
 
@@ -1271,7 +1273,7 @@ describe('string data type - matches option', () => {
     expect(err.tip).toContain('regex("^[0-9a-f]{7,40}$")');
   });
 
-  describe('deprecated /.../ regex strings', () => {
+  describe('deprecated regex patterns', () => {
     it('still interprets a bare /.../ string, with a warning', async () => {
       const g = await loadAndResolve(outdent`
         # @type=string(matches=/^[A-Z]+$/)
@@ -1281,8 +1283,8 @@ describe('string data type - matches option', () => {
       `);
       expect(g.configSchema.GOOD.isValid).toBe(true);
       expect(g.configSchema.GOOD.validationState).toBe('warn');
-      expect(g.configSchema.GOOD.errors[0].message).toContain('deprecated, use regex()');
-      expect(g.configSchema.GOOD.errors[0].tip).toContain('write it as regex("^[A-Z]+$")');
+      expect(g.configSchema.GOOD.errors[0].message).toContain('option "matches" - regex patterns are deprecated, use string rules instead');
+      expect(g.configSchema.GOOD.errors[0].tip).toContain('string rules: startsWith, endsWith');
       expect(g.configSchema.BAD.isValid).toBe(false);
     });
 
@@ -1293,7 +1295,7 @@ describe('string data type - matches option', () => {
       `);
       expect(g.configSchema.GOOD.isValid).toBe(true);
       expect(g.configSchema.GOOD.validationState).toBe('warn');
-      expect(g.configSchema.GOOD.errors[0].tip).toContain('write it as regex("^[0-9a-f]{7,40}$", "i")');
+      expect(g.configSchema.GOOD.errors[0].message).toContain('regex patterns are deprecated, use string rules instead');
     });
 
     it('reaches a nested element type', async () => {
@@ -1311,7 +1313,33 @@ describe('string data type - matches option', () => {
       `);
       expect(g.configSchema.GOOD.isValid).toBe(true);
       expect(g.configSchema.GOOD.validationState).toBe('warn');
-      expect(g.configSchema.GOOD.errors[0].tip).toContain('write it as regex("^[a-z]+$")');
+      expect(g.configSchema.GOOD.errors[0].message).toContain('regex patterns are deprecated, use string rules instead');
+    });
+
+    it('a regex() call on matches warns too', async () => {
+      const g = await loadAndResolve(outdent`
+        # @type=string(matches=regex("^signkey-prod-"))
+        GOOD=signkey-prod-abc
+      `);
+      expect(g.configSchema.GOOD.isValid).toBe(true);
+      expect(g.configSchema.GOOD.validationState).toBe('warn');
+      expect(g.configSchema.GOOD.errors).toHaveLength(1);
+      expect(g.configSchema.GOOD.errors[0].message).toContain('regex patterns are deprecated, use string rules instead');
+      // a simple pattern gets the exact rewrite
+      expect(g.configSchema.GOOD.errors[0].tip).toContain('write it as startsWith="signkey-prod-"');
+    });
+
+    it.each([
+      ['url', 'regex("^https://api[.]")', 'https://api.example.com', 'startsWith="https://api."'],
+      ['domain', 'regex("[.]example[.]com$")', 'api.example.com', 'endsWith=".example.com"'],
+    ])('a matches option on %s warns too', async (type, pattern, value, suggestion) => {
+      const g = await loadAndResolve(outdent`
+        # @type=${type}(matches=${pattern})
+        GOOD=${value}
+      `);
+      expect(g.configSchema.GOOD.isValid).toBe(true);
+      expect(g.configSchema.GOOD.validationState).toBe('warn');
+      expect(g.configSchema.GOOD.errors[0].tip).toContain(`write it as ${suggestion}`);
     });
 
     it('warns on a remap() match value', async () => {
@@ -1321,7 +1349,16 @@ describe('string data type - matches option', () => {
       `);
       expect(g.configSchema.R.resolvedValue).toBe('HIT');
       expect(g.configSchema.R.validationState).toBe('warn');
-      expect(g.configSchema.R.errors[0].tip).toContain('write it as regex("^dev.*", "i")');
+      expect(g.configSchema.R.errors[0].message).toBe('remap(): regex match values are deprecated, use glob() or an exact value instead');
+    });
+
+    it('warns on a remap() /.../ match value, with the glob() to use', async () => {
+      const g = await loadAndResolve(outdent`
+        SRC=dev-branch
+        R=remap($SRC, /^dev.*/, HIT, MISS)
+      `);
+      expect(g.configSchema.R.resolvedValue).toBe('HIT');
+      expect(g.configSchema.R.errors[0].tip).toContain('write /^dev.*/ as glob("dev*")');
     });
 
     it('warns on a resolver-valued matches once it resolves to a string', async () => {
@@ -1334,7 +1371,7 @@ describe('string data type - matches option', () => {
       expect(g.configSchema.GOOD.isValid).toBe(true);
       expect(g.configSchema.GOOD.validationState).toBe('warn');
       expect(g.configSchema.GOOD.errors).toHaveLength(1);
-      expect(g.configSchema.GOOD.errors[0].tip).toContain('write it as regex("^[A-Z]+$")');
+      expect(g.configSchema.GOOD.errors[0].message).toContain('regex patterns are deprecated, use string rules instead');
       expect(g.configSchema.BAD.isValid).toBe(false);
     });
 
@@ -1350,17 +1387,18 @@ describe('string data type - matches option', () => {
         expect(g.configSchema[key].isValid).toBe(true);
         expect(g.configSchema[key].validationState).toBe('warn');
         expect(g.configSchema[key].errors).toHaveLength(1);
-        expect(g.configSchema[key].errors[0].tip).toContain('there is no dynamic form');
+        expect(g.configSchema[key].errors[0].tip).toContain('startsWith=$PREFIX');
       }
     });
 
-    it('does not warn on a resolver-valued matches that resolves to a regex()', async () => {
+    it('warns on a resolver-valued matches that resolves to a regex()', async () => {
       const g = await loadAndResolve(outdent`
         # @type=string(matches=if(true, regex("^[A-Z]+$"), regex("^[a-z]+$")))
         GOOD=ABC
       `);
       expect(g.configSchema.GOOD.isValid).toBe(true);
-      expect(g.configSchema.GOOD.validationState).toBe('valid');
+      expect(g.configSchema.GOOD.validationState).toBe('warn');
+      expect(g.configSchema.GOOD.errors).toHaveLength(1);
     });
 
     it('warns on a resolver-valued remap() match once it resolves to a /.../ string', async () => {
@@ -1371,7 +1409,7 @@ describe('string data type - matches option', () => {
       `);
       expect(g.configSchema.R.resolvedValue).toBe('HIT');
       expect(g.configSchema.R.validationState).toBe('warn');
-      expect(g.configSchema.R.errors[0].tip).toContain('write it as regex("^dev.*", "i")');
+      expect(g.configSchema.R.errors[0].message).toContain('regex match values are deprecated');
     });
 
     it('leaves a plugin-defined type with its own `matches` option alone', async () => {
@@ -1397,14 +1435,15 @@ describe('string data type - matches option', () => {
       expect(g.configSchema.L.validationState).toBe('valid');
     });
 
-    it('does not warn on a remap() regex() call or a plain path', async () => {
+    it('warns on a remap() regex() call, but not on a plain path', async () => {
       const g = await loadAndResolve(outdent`
         SRC=dev-branch
         R=remap($SRC, regex("^dev.*", "i"), HIT, MISS)
         P=remap($SRC, /usr/local, HIT, MISS)
       `);
       expect(g.configSchema.R.resolvedValue).toBe('HIT');
-      expect(g.configSchema.R.validationState).toBe('valid');
+      expect(g.configSchema.R.validationState).toBe('warn');
+      expect(g.configSchema.R.errors[0].message).toContain('regex match values are deprecated');
       expect(g.configSchema.P.validationState).toBe('valid');
     });
   });

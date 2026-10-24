@@ -9,9 +9,10 @@ import {
 } from '@env-spec/parser';
 import type { CoercedType, EnvGraphDataType, EnvGraphDataTypeFactory } from './data-types';
 import {
-  assertUnwrappedRegexSource, convertParsedValueToResolvers, deprecatedRegexStringWarning,
+  assertUnwrappedRegexSource, convertParsedValueToResolvers,
   type Resolver,
 } from './resolver';
+import { matchesDeprecationWarning } from './regex-deprecation';
 import type { EnvGraphDataSource } from './data-source';
 import { SchemaError } from './errors';
 
@@ -29,7 +30,7 @@ export type TypeSpecContext = {
 /**
  * Built-in types whose `matches` option is read as a regex (see `parseRegexLikeString`).
  * Scoped by type name on purpose: a plugin-registered type may use `matches` for
- * something else entirely, and must not be told to migrate it to regex().
+ * something else entirely, and must not be told it is deprecated.
  */
 const REGEX_MATCHES_TYPES = new Set(['string', 'url', 'domain']);
 const REGEX_OPTION_NAMES = ['matches'];
@@ -124,9 +125,9 @@ function optionValue(
 ): any {
   const val = kv.value;
   if (val instanceof ParsedEnvSpecStaticValue) {
-    // a regex-taking option given a string - `/.../` or plain - rather than a regex() call
+    // a regex option given a string - `/.../` or plain
     if (readsOptionAsRegex(typeName, kv.key) && typeof val.value === 'string') {
-      ctx.warnings?.push(deprecatedRegexStringWarning(val.value, `${context} - option "${kv.key}"`));
+      pushWarningOnce(ctx.warnings, matchesDeprecationWarning(`${context} - option "${kv.key}"`, val.value));
     }
     return val.value;
   }
@@ -145,7 +146,11 @@ function optionValue(
           throw new SchemaError(`${context} - regex() flags must be a string in option "${kv.key}"`);
         }
         try {
-          return new RegExp(regexArgs[0], flags);
+          const regex = new RegExp(regexArgs[0], flags);
+          if (readsOptionAsRegex(typeName, kv.key)) {
+            pushWarningOnce(ctx.warnings, matchesDeprecationWarning(`${context} - option "${kv.key}"`, regex));
+          }
+          return regex;
         } catch (err) {
           throw new SchemaError(`${context} - invalid regex() in option "${kv.key}" - ${(err as Error).message}`);
         }
@@ -161,15 +166,10 @@ function optionValue(
       // since an empty optional item never resolves its type parts at all. Other resolver
       // calls may yield a regex() and are judged once they resolve (see build below).
       if (readsOptionAsRegex(typeName, kv.key) && val.name === 'ref') {
-        pushWarningOnce(ctx.warnings, new SchemaError(
-          `${context} - option "${kv.key}" - string patterns are deprecated, use regex() instead`,
-          {
-            isWarning: true,
-            tip: [
-              'a pattern referenced from another variable is a string, and a future major version will stop reading strings as regexes - there is no dynamic form',
-              'write the pattern directly: matches=regex("pattern", "flags")',
-            ],
-          },
+        pushWarningOnce(ctx.warnings, matchesDeprecationWarning(
+          `${context} - option "${kv.key}"`,
+          undefined,
+          'string rules take values from other variables too, e.g. startsWith=$PREFIX',
         ));
         return new DeferredValue(resolver, true);
       }
@@ -522,13 +522,13 @@ function buildTypeCallPlan(
     build: (resolved) => {
       if (positionals.length) return factory(...positionals);
       const materialized = materializeSettings(settings, resolved);
-      // a resolver-valued regex option (`matches=$PATTERN`) is only known to be a string
+      // a resolver-valued regex option (`matches=if(...)`) is only known to hold a pattern
       // once it resolves - warn then, so the dynamic path is not a silent migration
       for (const [key, val] of Object.entries(materialized)) {
         const setting = settings[key];
         if (!(setting instanceof DeferredValue) || setting.warnedAtPlanTime) continue;
-        if (readsOptionAsRegex(name, key) && typeof val === 'string') {
-          pushWarningOnce(ctx.warnings, deprecatedRegexStringWarning(val, `${context} - option "${key}"`));
+        if (readsOptionAsRegex(name, key) && (typeof val === 'string' || val instanceof RegExp)) {
+          pushWarningOnce(ctx.warnings, matchesDeprecationWarning(`${context} - option "${key}"`, val));
         }
       }
       if (Object.keys(materialized).length) return factory(materialized);

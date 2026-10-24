@@ -2,6 +2,7 @@ import _ from '@env-spec/utils/my-dash';
 import { type FallbackIfUnknown } from '@env-spec/utils/type-utils';
 import { CoercionError, ValidationError, type ErrorSeverity } from './errors';
 import { parseRegexLikeString } from './regex-like-string';
+import { checkStringRules, readStringRules, type StringRuleSettings } from './string-rules';
 import {
   parseDuration, convertDurationFromMs, type DurationUnit,
 } from '../../lib/duration';
@@ -226,18 +227,13 @@ const StringDataType = createEnvGraphDataType(
     maxLength?: number;
     /** The exact length of the string. */
     isLength?: number;
-    /** The required starting substring of the string. */
-    startsWith?: string;
-    /** The required ending substring of the string. */
-    endsWith?: string;
 
-    /** The regular expression or string pattern that the string must match. */
+    /**
+     * The regular expression or string pattern that the string must match.
+     * @deprecated use the string rules (startsWith, contains, chars, ...) instead
+     */
     matches?: RegExp | string;
 
-    // could add some shorthands for matching common patterns (isAlphaNumeric, etc...)
-    // could add allow/deny character lists?
-
-    // more stuff?
     /** converts to upper case */
     toUpperCase?: boolean;
     /** converts to lower case */
@@ -245,60 +241,58 @@ const StringDataType = createEnvGraphDataType(
 
     /** allow empty string as a valid string (default is to NOT allow it) */
     allowEmpty?: boolean;
-  }) => ({
-    name: 'string',
-    icon: 'carbon:string-text',
-    coerce: (rawVal) => {
+  } & StringRuleSettings) => {
+    const rules = readStringRules(settings);
+    return {
+      name: 'string',
+      icon: 'carbon:string-text',
+      coerce: (rawVal) => {
       // coerceToString will convert undefined to '', but this code should not even get called when that is the case
-      let val = coerceToString(rawVal);
-      // should we JSON.stringify objects?
-      if (settings?.toUpperCase) val = val.toUpperCase();
-      if (settings?.toLowerCase) val = val.toLowerCase();
-      return val;
-    },
-    validate: (val) => {
+        let val = coerceToString(rawVal);
+        // should we JSON.stringify objects?
+        if (settings?.toUpperCase) val = val.toUpperCase();
+        if (settings?.toLowerCase) val = val.toLowerCase();
+        return val;
+      },
+      validate: (val) => {
       // we support returning multiple errors and our base types use this pattern
       // but many user defined types should just throw the first error they encounter
-      const errors = [] as Array<ValidationError>;
+        const errors = [] as Array<ValidationError>;
 
-      // TODO: not sure if we want this?
-      // // special handling to not allow empty strings (unless explicitly allowed)
-      // if (val === '' && !settings?.allowEmpty) {
-      //   return [new ValidationError('If set, string must not be empty')];
-      // }
+        // TODO: not sure if we want this?
+        // // special handling to not allow empty strings (unless explicitly allowed)
+        // if (val === '' && !settings?.allowEmpty) {
+        //   return [new ValidationError('If set, string must not be empty')];
+        // }
 
-      if (settings?.minLength !== undefined && val.length < settings.minLength) {
-        errors.push(new ValidationError(`Length must be more than ${settings.minLength}`));
-      }
-      if (settings?.maxLength !== undefined && val.length > settings.maxLength) {
-        errors.push(new ValidationError(`Length must be less than ${settings.maxLength}`));
-      }
-      if (settings?.isLength !== undefined && val.length !== settings.isLength) {
-        errors.push(new ValidationError(`Length must be exactly ${settings.isLength}`));
-      }
-
-      if (settings?.startsWith && !val.startsWith(settings.startsWith)) {
-        errors.push(new ValidationError(`Value must start with "${settings.startsWith}"`));
-      }
-      if (settings?.endsWith && !val.endsWith(settings.endsWith)) {
-        errors.push(new ValidationError(`Value must end with "${settings.endsWith}"`));
-      }
-
-      if (settings?.matches) {
-        let regex: RegExp;
-        if (_.isString(settings.matches)) {
-          regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
-        } else {
-          regex = settings.matches;
+        if (settings?.minLength !== undefined && val.length < settings.minLength) {
+          errors.push(new ValidationError(`Length must be more than ${settings.minLength}`));
         }
-        const matches = val.match(regex);
-        if (!matches) {
-          errors.push(new ValidationError(`Value must match regex "${settings.matches}"`));
+        if (settings?.maxLength !== undefined && val.length > settings.maxLength) {
+          errors.push(new ValidationError(`Length must be less than ${settings.maxLength}`));
         }
-      }
-      return errors.length ? errors : true;
-    },
-  }),
+        if (settings?.isLength !== undefined && val.length !== settings.isLength) {
+          errors.push(new ValidationError(`Length must be exactly ${settings.isLength}`));
+        }
+
+        errors.push(...checkStringRules(val, rules));
+
+        if (settings?.matches) {
+          let regex: RegExp;
+          if (_.isString(settings.matches)) {
+            regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
+          } else {
+            regex = settings.matches;
+          }
+          const matches = val.match(regex);
+          if (!matches) {
+            errors.push(new ValidationError(`Value must match regex "${settings.matches}"`));
+          }
+        }
+        return errors.length ? errors : true;
+      },
+    };
+  },
 );
 
 
@@ -525,160 +519,167 @@ const UrlDataType = createEnvGraphDataType(
     allowNoHost?: boolean
     /** Disallow a trailing slash on the URL path. */
     noTrailingSlash?: boolean
-    /** A regular expression or string pattern that the full URL must match. */
+    /**
+     * A regular expression or string pattern that the full URL must match.
+     * @deprecated use the string rules (startsWith, notStartsWith, contains, ...) instead
+     */
     matches?: RegExp | string
-  }) => ({
-    name: 'url',
-    icon: 'carbon:url',
-    // A valid, unique, non-routable URL (`.invalid` is reserved, RFC 2606).
-    generatePlaceholder: (seed) => `https://${seed}.invalid/`,
-    coerce(rawVal) {
-      const val = coerceToString(rawVal);
-      if (settings?.prependHttps && !hasUrlScheme(val, settings.allowedProtocols)) return `https://${val}`;
-      return val;
-    },
-    validate(val) {
-      let url: URL;
-      try {
-        url = new URL(val); // if invalid, this will throw
-      } catch (err) {
-        throw new ValidationError('Invalid URL');
-      }
-      const errors = [] as Array<ValidationError>;
-      const ambiguousHostError = settings?.allowedDomains ? findAmbiguousUrlHost(val, url) : undefined;
-      const structureIssue = checkUrlStructure(val, url, { allowNoHost: settings?.allowNoHost });
-      // the allowedDomains check already reports these as an error, so skip the duplicate
-      if (structureIssue && !ambiguousHostError) {
-        errors.push(new ValidationError(structureIssue, { severity: STRICT_URL_SEVERITY, tip: STRICT_URL_TIP }));
-      }
-      const protocol = url.protocol.replace(/:$/, '').toLowerCase();
-      const rawAllowedProtocols = settings?.allowedProtocols;
-      if (rawAllowedProtocols === undefined) {
-        if (!DEFAULT_URL_PROTOCOLS.includes(protocol)) {
-          errors.push(new ValidationError(
-            `Protocol (${protocol}) will not be allowed by default in the next major version of varlock`,
-            {
-              severity: STRICT_URL_SEVERITY,
-              tip: `Only http and https are allowed unless set explicitly: add \`allowedProtocols=[${protocol}]\`, or \`allowedProtocols="*"\` to allow any.`,
-            },
-          ));
+  } & StringRuleSettings) => {
+    const rules = readStringRules(settings);
+    return {
+      name: 'url',
+      icon: 'carbon:url',
+      // A valid, unique, non-routable URL (`.invalid` is reserved, RFC 2606).
+      generatePlaceholder: (seed) => `https://${seed}.invalid/`,
+      coerce(rawVal) {
+        const val = coerceToString(rawVal);
+        if (settings?.prependHttps && !hasUrlScheme(val, settings.allowedProtocols)) return `https://${val}`;
+        return val;
+      },
+      validate(val) {
+        let url: URL;
+        try {
+          url = new URL(val); // if invalid, this will throw
+        } catch (err) {
+          throw new ValidationError('Invalid URL');
         }
-      } else if (rawAllowedProtocols === '*') {
+        const errors = [] as Array<ValidationError>;
+        const ambiguousHostError = settings?.allowedDomains ? findAmbiguousUrlHost(val, url) : undefined;
+        const structureIssue = checkUrlStructure(val, url, { allowNoHost: settings?.allowNoHost });
+        // the allowedDomains check already reports these as an error, so skip the duplicate
+        if (structureIssue && !ambiguousHostError) {
+          errors.push(new ValidationError(structureIssue, { severity: STRICT_URL_SEVERITY, tip: STRICT_URL_TIP }));
+        }
+        const protocol = url.protocol.replace(/:$/, '').toLowerCase();
+        const rawAllowedProtocols = settings?.allowedProtocols;
+        if (rawAllowedProtocols === undefined) {
+          if (!DEFAULT_URL_PROTOCOLS.includes(protocol)) {
+            errors.push(new ValidationError(
+              `Protocol (${protocol}) will not be allowed by default in the next major version of varlock`,
+              {
+                severity: STRICT_URL_SEVERITY,
+                tip: `Only http and https are allowed unless set explicitly: add \`allowedProtocols=[${protocol}]\`, or \`allowedProtocols="*"\` to allow any.`,
+              },
+            ));
+          }
+        } else if (rawAllowedProtocols === '*') {
         // any protocol
-      } else if (
-        !Array.isArray(rawAllowedProtocols)
+        } else if (
+          !Array.isArray(rawAllowedProtocols)
         || rawAllowedProtocols.some((allowedProtocol) => !_.isString(allowedProtocol))
-      ) {
-        errors.push(new ValidationError('allowedProtocols must be an array of strings'));
-      } else {
-        const allowedProtocols = rawAllowedProtocols.map((allowedProtocol) => (
-          allowedProtocol.replace(/:$/, '').toLowerCase()
-        ));
-        if (!allowedProtocols.includes('*') && !allowedProtocols.includes(protocol)) {
-          errors.push(new ValidationError(`Protocol (${protocol}) is not in allowed list: ${rawAllowedProtocols.join(',')}`));
+        ) {
+          errors.push(new ValidationError('allowedProtocols must be an array of strings'));
+        } else {
+          const allowedProtocols = rawAllowedProtocols.map((allowedProtocol) => (
+            allowedProtocol.replace(/:$/, '').toLowerCase()
+          ));
+          if (!allowedProtocols.includes('*') && !allowedProtocols.includes(protocol)) {
+            errors.push(new ValidationError(`Protocol (${protocol}) is not in allowed list: ${rawAllowedProtocols.join(',')}`));
+          }
         }
-      }
-      if (settings?.allowedDomains) {
+        if (settings?.allowedDomains) {
         // an array is the documented form, but a bare string means a single host - the
         // vscode snippet used to insert one. Either way the host is matched in full;
         // this was previously a `String.prototype.includes` substring match, which let
         // "example.com" pass an allowlist of "myexample.com", and threw on `.join`
         // when building the rejection message for a multi-host string.
-        const rawAllowedDomains = settings.allowedDomains;
-        let allowedDomains: Array<string> | undefined;
-        if (Array.isArray(rawAllowedDomains)) {
-          if (rawAllowedDomains.some((allowedDomain) => !_.isString(allowedDomain))) {
-            errors.push(new ValidationError('allowedDomains must be an array of strings'));
-          } else {
-            allowedDomains = rawAllowedDomains;
-          }
-        } else if (_.isString(rawAllowedDomains)) {
-          if (rawAllowedDomains.includes(',')) {
+          const rawAllowedDomains = settings.allowedDomains;
+          let allowedDomains: Array<string> | undefined;
+          if (Array.isArray(rawAllowedDomains)) {
+            if (rawAllowedDomains.some((allowedDomain) => !_.isString(allowedDomain))) {
+              errors.push(new ValidationError('allowedDomains must be an array of strings'));
+            } else {
+              allowedDomains = rawAllowedDomains;
+            }
+          } else if (_.isString(rawAllowedDomains)) {
+            if (rawAllowedDomains.includes(',')) {
             // a comma-string used to match by substring, so it appeared to work. Point at
             // the array form rather than guessing that commas were meant as separators.
-            const asArray = rawAllowedDomains.split(',').map((d) => d.trim()).filter(Boolean).join(', ');
-            errors.push(new ValidationError(
-              `allowedDomains must be an array of strings - use allowedDomains=[${asArray}]`,
-            ));
+              const asArray = rawAllowedDomains.split(',').map((d) => d.trim()).filter(Boolean).join(', ');
+              errors.push(new ValidationError(
+                `allowedDomains must be an array of strings - use allowedDomains=[${asArray}]`,
+              ));
+            } else {
+              allowedDomains = [rawAllowedDomains];
+            }
           } else {
-            allowedDomains = [rawAllowedDomains];
+            errors.push(new ValidationError('allowedDomains must be an array of strings'));
           }
-        } else {
-          errors.push(new ValidationError('allowedDomains must be an array of strings'));
-        }
-        if (allowedDomains) {
-          const normalizedDomains = allowedDomains
-            .map((allowedDomain) => allowedDomain.trim().toLowerCase())
-            .filter(Boolean);
-          // Entries are a hostname with an optional port, and nothing else. Handing a
-          // whole entry to `URL` would let its authority parser read credentials and
-          // silently swap the host: `trusted.example:443@evil.example:8443` parses with a
-          // host of `evil.example:8443`, authorizing that and rejecting trusted.example.
-          // The bracketed alternative keeps IPv6 (`[::1]`, `[::1]:3000`) working.
-          // `\` is excluded alongside `/` because WHATWG treats it as a path separator for
-          // special schemes, so `trusted.example\path` would otherwise parse as a host plus path
-          const HOST_ENTRY_REGEX = /^(?:\[[0-9a-f:.]+\]|[^\s\\/?#@:[\]]+)(?::\d+)?$/i;
-          const malformedDomains = normalizedDomains.filter((d) => !HOST_ENTRY_REGEX.test(d));
-          if (!normalizedDomains.length) {
+          if (allowedDomains) {
+            const normalizedDomains = allowedDomains
+              .map((allowedDomain) => allowedDomain.trim().toLowerCase())
+              .filter(Boolean);
+            // Entries are a hostname with an optional port, and nothing else. Handing a
+            // whole entry to `URL` would let its authority parser read credentials and
+            // silently swap the host: `trusted.example:443@evil.example:8443` parses with a
+            // host of `evil.example:8443`, authorizing that and rejecting trusted.example.
+            // The bracketed alternative keeps IPv6 (`[::1]`, `[::1]:3000`) working.
+            // `\` is excluded alongside `/` because WHATWG treats it as a path separator for
+            // special schemes, so `trusted.example\path` would otherwise parse as a host plus path
+            const HOST_ENTRY_REGEX = /^(?:\[[0-9a-f:.]+\]|[^\s\\/?#@:[\]]+)(?::\d+)?$/i;
+            const malformedDomains = normalizedDomains.filter((d) => !HOST_ENTRY_REGEX.test(d));
+            if (!normalizedDomains.length) {
             // an empty list can never match, so say so rather than rejecting every URL
             // with an allowlist that has nothing in it to report
-            errors.push(new ValidationError('allowedDomains must not be empty'));
-          } else if (malformedDomains.length) {
+              errors.push(new ValidationError('allowedDomains must not be empty'));
+            } else if (malformedDomains.length) {
             // credentials make it ambiguous which host was meant, so suggest nothing there
             // rather than pointing at the one the entry would actually have authorized
-            const suggestions = malformedDomains
-              .map((d) => d.replace(/^[a-z][a-z\d+.-]*:\/\//, ''))
-              .filter((d) => !d.includes('@'))
-              .map((d) => d.split(/[/?#]/)[0])
-              .filter((d) => HOST_ENTRY_REGEX.test(d));
-            const suggestionText = suggestions.length ? ` - use ${suggestions.join(', ')}` : '';
-            errors.push(new ValidationError(
-              `allowedDomains entries must be a hostname with an optional port${suggestionText}`,
-            ));
-          } else if (ambiguousHostError) {
-            errors.push(new ValidationError(ambiguousHostError));
-          } else {
+              const suggestions = malformedDomains
+                .map((d) => d.replace(/^[a-z][a-z\d+.-]*:\/\//, ''))
+                .filter((d) => !d.includes('@'))
+                .map((d) => d.split(/[/?#]/)[0])
+                .filter((d) => HOST_ENTRY_REGEX.test(d));
+              const suggestionText = suggestions.length ? ` - use ${suggestions.join(', ')}` : '';
+              errors.push(new ValidationError(
+                `allowedDomains entries must be a hostname with an optional port${suggestionText}`,
+              ));
+            } else if (ambiguousHostError) {
+              errors.push(new ValidationError(ambiguousHostError));
+            } else {
             // Both sides go through the same parser, so a protocol default port (`:443`
             // on https) and an IDN hostname normalize identically before comparing. An
             // entry naming a port pins it; one without allows any port on the value.
-            const matchesAllowedDomain = (allowedDomain: string) => {
-              try {
-                const parsed = new URL(`${url.protocol}//${allowedDomain}`);
-                return /:\d+$/.test(allowedDomain)
-                  ? parsed.host === url.host.toLowerCase()
-                  : parsed.hostname === url.hostname.toLowerCase();
-              } catch {
-                return false;
+              const matchesAllowedDomain = (allowedDomain: string) => {
+                try {
+                  const parsed = new URL(`${url.protocol}//${allowedDomain}`);
+                  return /:\d+$/.test(allowedDomain)
+                    ? parsed.host === url.host.toLowerCase()
+                    : parsed.hostname === url.hostname.toLowerCase();
+                } catch {
+                  return false;
+                }
+              };
+              if (!normalizedDomains.some(matchesAllowedDomain)) {
+                errors.push(new ValidationError(`Domain (${url.host}) is not in allowed list: ${normalizedDomains.join(',')}`));
               }
-            };
-            if (!normalizedDomains.some(matchesAllowedDomain)) {
-              errors.push(new ValidationError(`Domain (${url.host}) is not in allowed list: ${normalizedDomains.join(',')}`));
             }
           }
         }
-      }
-      // Checked against the written value rather than `url.pathname`, which normalizes
-      // `https://example.com` to a `/` path and so cannot tell the two spellings apart.
-      // A root `/` counts: this option exists so `${MY_URL}/path` cannot produce `//path`,
-      // and `https://example.com/` breaks that concatenation like any other trailing slash.
-      // Query and hash are dropped first, so `https://example.com/path/?q=1` is caught too.
-      if (settings?.noTrailingSlash && val.split(/[?#]/)[0].endsWith('/')) {
-        errors.push(new ValidationError('URL must not have a trailing slash'));
-      }
-      if (settings?.matches) {
-        let regex: RegExp;
-        if (_.isString(settings.matches)) {
-          regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
-        } else {
-          regex = settings.matches;
+        // Checked against the written value rather than `url.pathname`, which normalizes
+        // `https://example.com` to a `/` path and so cannot tell the two spellings apart.
+        // A root `/` counts: this option exists so `${MY_URL}/path` cannot produce `//path`,
+        // and `https://example.com/` breaks that concatenation like any other trailing slash.
+        // Query and hash are dropped first, so `https://example.com/path/?q=1` is caught too.
+        if (settings?.noTrailingSlash && val.split(/[?#]/)[0].endsWith('/')) {
+          errors.push(new ValidationError('URL must not have a trailing slash'));
         }
-        if (!regex.test(val)) {
-          errors.push(new ValidationError(`URL must match regex "${settings.matches}"`));
+        if (settings?.matches) {
+          let regex: RegExp;
+          if (_.isString(settings.matches)) {
+            regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
+          } else {
+            regex = settings.matches;
+          }
+          if (!regex.test(val)) {
+            errors.push(new ValidationError(`URL must match regex "${settings.matches}"`));
+          }
         }
-      }
-      return errors.length ? errors : true;
-    },
-  }),
+        errors.push(...checkStringRules(val, rules, 'URL'));
+        return errors.length ? errors : true;
+      },
+    };
+  },
 );
 
 
@@ -706,91 +707,98 @@ const DomainDataType = createEnvGraphDataType(
     allowIpV6?: boolean;
     /** convert to lowercase */
     normalize?: boolean;
-    /** A regular expression or string pattern that the domain must match. */
+    /**
+     * A regular expression or string pattern that the domain must match.
+     * @deprecated use the string rules (endsWith, notContains, chars, ...) instead
+     */
     matches?: RegExp | string;
-  }) => ({
-    name: 'domain',
-    icon: 'mdi:web',
-    typeDescription: 'bare domain name (hostname) with no protocol, port, or path',
-    // A valid, unique domain at the reserved `.invalid` TLD (RFC 2606).
-    generatePlaceholder: (seed) => `${seed}.invalid`,
-    coerce(rawVal) {
-      let val = coerceToString(rawVal).trim();
-      if (settings?.normalize) val = val.toLowerCase();
-      return val;
-    },
-    validate(val) {
+  } & StringRuleSettings) => {
+    const rules = readStringRules(settings);
+    return {
+      name: 'domain',
+      icon: 'mdi:web',
+      typeDescription: 'bare domain name (hostname) with no protocol, port, or path',
+      // A valid, unique domain at the reserved `.invalid` TLD (RFC 2606).
+      generatePlaceholder: (seed) => `${seed}.invalid`,
+      coerce(rawVal) {
+        let val = coerceToString(rawVal).trim();
+        if (settings?.normalize) val = val.toLowerCase();
+        return val;
+      },
+      validate(val) {
       // IPv6 has to be checked before the port/colon guard below, since the address is all colons.
       // Both the bracketed form (as it appears in a url or Host header) and the bare form are ok.
       // Like the IPv4 path this skips only the hostname structure checks - `matches` still applies.
-      const isIpV6 = !!settings?.allowIpV6 && IP_V6_ADDRESS_REGEX.test(
-        val.startsWith('[') && val.endsWith(']') ? val.slice(1, -1) : val,
-      );
+        const isIpV6 = !!settings?.allowIpV6 && IP_V6_ADDRESS_REGEX.test(
+          val.startsWith('[') && val.endsWith(']') ? val.slice(1, -1) : val,
+        );
 
-      if (!isIpV6) {
+        if (!isIpV6) {
         // friendlier errors for the most likely mistakes (pasting a full URL)
-        if (val.includes('://')) {
-          throw new ValidationError('Domain must not include a protocol', { tip: 'use @type=url for full URLs' });
-        }
-        if (val.includes('/')) {
-          throw new ValidationError('Domain must not include a path', { tip: 'use @type=url for full URLs' });
-        }
-        if (val.includes(':')) {
-          throw new ValidationError('Domain must not include a port');
-        }
-        if (val.includes('@')) {
-          throw new ValidationError('Domain must not include credentials or an @ sign');
-        }
+          if (val.includes('://')) {
+            throw new ValidationError('Domain must not include a protocol', { tip: 'use @type=url for full URLs' });
+          }
+          if (val.includes('/')) {
+            throw new ValidationError('Domain must not include a path', { tip: 'use @type=url for full URLs' });
+          }
+          if (val.includes(':')) {
+            throw new ValidationError('Domain must not include a port');
+          }
+          if (val.includes('@')) {
+            throw new ValidationError('Domain must not include credentials or an @ sign');
+          }
 
-        // a valid IPv4 address skips the domain structure checks (matches still applies below)
-        if (!(settings?.allowIp && IP_V4_ADDRESS_REGEX.test(val))) {
-          let domain = val;
-          if (domain.startsWith('*.')) {
-            if (!settings?.allowWildcard) {
-              throw new ValidationError('Wildcard domains are not allowed', { tip: 'set allowWildcard=true to allow them' });
+          // a valid IPv4 address skips the domain structure checks (matches still applies below)
+          if (!(settings?.allowIp && IP_V4_ADDRESS_REGEX.test(val))) {
+            let domain = val;
+            if (domain.startsWith('*.')) {
+              if (!settings?.allowWildcard) {
+                throw new ValidationError('Wildcard domains are not allowed', { tip: 'set allowWildcard=true to allow them' });
+              }
+              domain = domain.slice(2);
             }
-            domain = domain.slice(2);
-          }
 
-          // the 253-char total limit (RFC 1035) counts the wildcard label too, so check `val`
-          if (domain.length === 0 || val.length > 253) {
-            throw new ValidationError('Value must be a valid domain name');
-          }
-
-          const labels = domain.split('.');
-          if (labels.some((label) => !DOMAIN_LABEL_REGEX.test(label))) {
-            throw new ValidationError('Value must be a valid domain name');
-          }
-          // an all-numeric final label means this is really an IP address (or a malformed one)
-          if (/^\d+$/.test(labels[labels.length - 1])) {
-            if (settings?.allowIp) {
-              throw new ValidationError('Value must be a valid domain name or IPv4 address');
+            // the 253-char total limit (RFC 1035) counts the wildcard label too, so check `val`
+            if (domain.length === 0 || val.length > 253) {
+              throw new ValidationError('Value must be a valid domain name');
             }
-            throw new ValidationError('Value must be a domain name, not an IP address', { tip: 'use @type=ip for IP addresses, or set allowIp=true to allow both' });
-          }
-          if (labels.length < 2 && !settings?.allowSingleLabel) {
-            throw new ValidationError(
-              'Domain must include at least two labels (e.g. "example.com")',
-              { tip: 'set allowSingleLabel=true to allow hostnames like "localhost"' },
-            );
-          }
-        }
-      }
 
-      if (settings?.matches) {
-        let regex: RegExp;
-        if (_.isString(settings.matches)) {
-          regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
-        } else {
-          regex = settings.matches;
+            const labels = domain.split('.');
+            if (labels.some((label) => !DOMAIN_LABEL_REGEX.test(label))) {
+              throw new ValidationError('Value must be a valid domain name');
+            }
+            // an all-numeric final label means this is really an IP address (or a malformed one)
+            if (/^\d+$/.test(labels[labels.length - 1])) {
+              if (settings?.allowIp) {
+                throw new ValidationError('Value must be a valid domain name or IPv4 address');
+              }
+              throw new ValidationError('Value must be a domain name, not an IP address', { tip: 'use @type=ip for IP addresses, or set allowIp=true to allow both' });
+            }
+            if (labels.length < 2 && !settings?.allowSingleLabel) {
+              throw new ValidationError(
+                'Domain must include at least two labels (e.g. "example.com")',
+                { tip: 'set allowSingleLabel=true to allow hostnames like "localhost"' },
+              );
+            }
+          }
         }
-        if (!regex.test(val)) {
-          throw new ValidationError(`Domain must match regex "${settings.matches}"`);
+
+        if (settings?.matches) {
+          let regex: RegExp;
+          if (_.isString(settings.matches)) {
+            regex = parseRegexLikeString(settings.matches) ?? new RegExp(settings.matches);
+          } else {
+            regex = settings.matches;
+          }
+          if (!regex.test(val)) {
+            throw new ValidationError(`Domain must match regex "${settings.matches}"`);
+          }
         }
-      }
-      return true;
-    },
-  }),
+        const ruleErrors = checkStringRules(val, rules, 'Domain');
+        return ruleErrors.length ? ruleErrors : true;
+      },
+    };
+  },
 );
 
 
