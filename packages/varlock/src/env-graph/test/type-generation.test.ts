@@ -1325,6 +1325,23 @@ describe('type generation', () => {
       expect(src).toContain('ICON_ITEM: string;');
     });
 
+    test('fetchIcons=false never calls the network but still embeds bundled and plugin icons', async () => {
+      const fetchMock = vi.fn(async () => new Response('<svg></svg>', { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const unknown = await generateTsTypesSrc([iconField(uniqueIconName('offline'))], { fetchIcons: false });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(unknown).not.toContain('![icon]');
+
+      const pluginIconName = uniqueIconName('offline-plugin');
+      const withKnown = await generateTsTypesSrc([iconField('carbon:url'), iconField(pluginIconName)], {
+        fetchIcons: false,
+        pluginIcons: { [pluginIconName]: '<svg fill="currentColor"></svg>' },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(withKnown.match(/!\[icon\]/g)).toHaveLength(2);
+    });
+
     test('non-boolean icons value is an error', async () => {
       await expect(generateTsTypesSrc([], { icons: 'nope' as any })).rejects.toThrow('invalid `icons` value');
     });

@@ -58,12 +58,16 @@ async function load(opts?: {
   processEnvOverride?: Record<string, string | undefined>;
   clearCache?: boolean;
   skipCache?: boolean;
+  mode?: 'default' | 'shape';
+  overrideValues?: Record<string, string | undefined>;
 }) {
   return loadEnvGraph({
     entryFilePaths: path.join(tempProjectDir, '.env.schema'),
     processEnvOverride: opts?.processEnvOverride ?? {},
     clearCache: opts?.clearCache,
     skipCache: opts?.skipCache,
+    mode: opts?.mode,
+    overrideValues: opts?.overrideValues,
   });
 }
 
@@ -119,6 +123,41 @@ describe('loadEnvGraph cache auto-policy', () => {
     mockBackendType = 'file';
     await load();
     expect(mockGetBackendInfo).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadEnvGraph in shape mode', () => {
+  it('creates no cache store, even where plain loading would create a disk store', async () => {
+    mockGetBackendInfo.mockClear();
+    const graph = await load({ mode: 'shape' });
+    expect(graph.mode).toBe('shape');
+    expect(graph._cacheStore).toBeUndefined();
+
+    // control: the same setup in default mode does create one
+    expect((await load()).mode).toBe('default');
+    expect((await load())._cacheStore).toBeInstanceOf(CacheStore);
+  });
+
+  it('does not clear the disk cache for --clear-cache', async () => {
+    const cacheDir = path.join(tempConfigDir, 'cache');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const filePath = path.join(cacheDir, 'varlock-default.json');
+    const entries = { 'plugin:test:k': { v: 'enc:whatever', c: Date.now(), e: Date.now() + 60_000 } };
+    fs.writeFileSync(filePath, JSON.stringify(entries));
+
+    await load({ mode: 'shape', clearCache: true });
+    expect(JSON.parse(fs.readFileSync(filePath, 'utf-8'))).toEqual(entries);
+  });
+
+  it('ignores override values', async () => {
+    fs.writeFileSync(path.join(tempProjectDir, '.env.schema'), '# ---\nFOO=bar\n');
+    const overridden = await load({ overrideValues: { FOO: 'from-env' } });
+    await overridden.resolveEnvValues();
+    expect(overridden.configSchema.FOO.resolvedValue).toBe('from-env'); // control
+
+    const shapeGraph = await load({ mode: 'shape', overrideValues: { FOO: 'from-env' } });
+    await shapeGraph.resolveEnvValues();
+    expect(shapeGraph.configSchema.FOO.resolvedValue).toBe('bar');
   });
 });
 

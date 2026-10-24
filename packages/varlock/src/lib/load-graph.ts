@@ -59,6 +59,7 @@ function loadFromPaths(
     overrideValues?: Record<string, string | undefined>,
     clearCache?: boolean,
     skipCache?: boolean,
+    mode?: 'default' | 'shape',
     proxyResolutionView?: ProxyResolutionView,
   },
 ) {
@@ -87,6 +88,7 @@ function loadFromPaths(
     processEnvOverride: config.overrideValues,
     clearCache: config.clearCache,
     skipCache: config.skipCache,
+    mode: config.mode,
     afterInit: async (g) => {
       g.registerResolver(VarlockResolver);
       g.registerResolver(KeychainResolver);
@@ -106,6 +108,12 @@ export async function loadVarlockEnvGraph(opts?: {
   /** Skip cache entirely for this invocation */
   skipCache?: boolean,
   /**
+   * `shape` loads the graph without running `exec()`, root decorators, secret providers, or
+   * plugin downloads, and ignores `process.env` overrides. Use it for commands that only inspect
+   * the schema. See the shape mode guide.
+   */
+  mode?: 'default' | 'shape',
+  /**
    * Skip the proxy schema-fingerprint guard for this load. Used by the `proxy`
    * command itself (it manages the session fingerprint directly), so that
    * `proxy reload` can apply a schema change without being blocked by the
@@ -113,7 +121,9 @@ export async function loadVarlockEnvGraph(opts?: {
    */
   skipProxyFingerprintGuard?: boolean,
 }) {
-  const runtimeOverrideValues = getGraphEnvOverridesFromRuntimeEnv();
+  const isShapeLoad = opts?.mode === 'shape';
+  // shape mode never reads item values from the environment, so there is nothing to override
+  const runtimeOverrideValues = isShapeLoad ? undefined : getGraphEnvOverridesFromRuntimeEnv();
 
   // Fail closed: if this process is a proxy child (the injected `__VARLOCK_PROXY_CHILD`
   // marker is the reliable in-tree signal) but its session record can't be resolved
@@ -129,7 +139,8 @@ export async function loadVarlockEnvGraph(opts?: {
     });
   }
 
-  const proxyResolutionView = await getProxyResolutionViewForEnv().catch(() => undefined);
+  // the proxy view only overlays resolved values, which shape mode never produces
+  const proxyResolutionView = isShapeLoad ? undefined : await getProxyResolutionViewForEnv().catch(() => undefined);
   if (proxyResolutionView) {
     debug('applying proxy resolution view (%d item(s))', Object.keys(proxyResolutionView).length);
   }
@@ -147,6 +158,7 @@ export async function loadVarlockEnvGraph(opts?: {
         overrideValues: runtimeOverrideValues,
         clearCache: opts?.clearCache,
         skipCache: opts?.skipCache,
+        mode: opts?.mode,
         proxyResolutionView,
       });
     }
@@ -164,6 +176,7 @@ export async function loadVarlockEnvGraph(opts?: {
         overrideValues: runtimeOverrideValues,
         clearCache: opts?.clearCache,
         skipCache: opts?.skipCache,
+        mode: opts?.mode,
         proxyResolutionView,
       });
     }
@@ -176,6 +189,7 @@ export async function loadVarlockEnvGraph(opts?: {
       processEnvOverride: runtimeOverrideValues,
       clearCache: opts?.clearCache,
       skipCache: opts?.skipCache,
+      mode: opts?.mode,
       afterInit: async (g) => {
         g.registerResolver(VarlockResolver);
         g.registerResolver(KeychainResolver);

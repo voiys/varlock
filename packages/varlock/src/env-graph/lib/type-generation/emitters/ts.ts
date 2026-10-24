@@ -55,6 +55,7 @@ const iconFetchFailedNames = new Set<string>();
 async function fetchIconSvg(
   iconifyName: string,
   pluginIcons: Record<string, string>,
+  allowFetch: boolean,
   color = '808080',
   iconCacheFolder = '/tmp/varlock-icon-cache',
 ) {
@@ -73,7 +74,7 @@ async function fetchIconSvg(
     const svgFileBuffer = await fs.promises.readFile(iconPath, 'utf-8');
     svgSrc = svgFileBuffer.toString();
     iconInMemoryCache[iconPath] = svgSrc;
-  } else if (iconFetchFailedNames.has(iconifyName)) {
+  } else if (!allowFetch || iconFetchFailedNames.has(iconifyName)) {
     return;
   } else {
     try {
@@ -105,7 +106,7 @@ async function fetchIconSvg(
 async function getTsDefinitionForField(
   field: ResolvedFieldType,
   indentLevel: number,
-  opts: Pick<Required<TsGenOptions>, 'icons' | 'pluginIcons'>,
+  opts: Pick<Required<TsGenOptions>, 'icons' | 'pluginIcons' | 'fetchIcons'>,
 ) {
   const i = _.times(indentLevel, () => '  ').join('');
   const itemSrc = [];
@@ -119,7 +120,7 @@ async function getTsDefinitionForField(
 
   // custom icons are fetched over the network (see fetchIconSvg), so `icons=false` keeps output network-independent
   if (docs.icon && opts.icons) {
-    const iconSvg = await fetchIconSvg(docs.icon, opts.pluginIcons);
+    const iconSvg = await fetchIconSvg(docs.icon, opts.pluginIcons, opts.fetchIcons);
     if (iconSvg) jsDocLines.push(`![icon](data:image/svg+xml;utf-8,${encodeURIComponent(iconSvg)}) `);
   }
 
@@ -196,6 +197,12 @@ export type TsGenOptions = {
   icons?: boolean;
   /** icon SVGs bundled by plugins, keyed by iconify name (set from the graph, not a decorator arg) */
   pluginIcons?: Record<string, string>;
+  /**
+   * Allow downloading icons that are not bundled or already cached on disk (defaults to true). Set from
+   * the graph, not a decorator arg: a graph in shape mode never uses the network, so such an icon is
+   * left out of the JSDoc.
+   */
+  fetchIcons?: boolean;
 };
 
 // defaults preserve the historical output: globally augment `varlock/env`, and augment both globals
@@ -211,6 +218,7 @@ const DEFAULT_TS_GEN_OPTIONS = {
   processEnvSkipNote: '',
   icons: true,
   pluginIcons: {},
+  fetchIcons: true,
 } satisfies Required<TsGenOptions>;
 
 const TS_ENV_EXPOSURE_VALUES: ReadonlyArray<TsEnvExposure> = ['global', 'local', 'none'];
@@ -246,6 +254,7 @@ function resolveTsGenOptions(options: Record<string, any> = {}): Required<TsGenO
     processEnvSkipNote: options.processEnvSkipNote || '',
     icons: coerceBooleanOption(options.icons, DEFAULT_TS_GEN_OPTIONS.icons, 'icons'),
     pluginIcons: options.pluginIcons ?? DEFAULT_TS_GEN_OPTIONS.pluginIcons,
+    fetchIcons: options.fetchIcons ?? DEFAULT_TS_GEN_OPTIONS.fetchIcons,
   };
 }
 
