@@ -99,7 +99,7 @@ Maps a value to a new value based on a set of lookup pairs. This is useful for t
 - The first argument is the value to remap (often a `ref()` to another variable).
 - All following arguments are pairs of `(matchValue, resultValue)`.
 - An optional trailing default value can be added as the last argument (when the total number of remaining args is odd).
-- Match values can be a string, `undefined`, or a [`regex()`](#regex) call.
+- Match values can be a string, `undefined`, or a [`glob()`](#glob) pattern. A [`regex()`](#regex) call also still works, but is deprecated.
 - If no match is found and there is no default, the original value is returned.
 
 ```env-spec "remap"
@@ -107,7 +107,7 @@ Maps a value to a new value based on a set of lookup pairs. This is useful for t
 CI_BRANCH=
 
 # @type=enum(development, preview, production)
-APP_ENV=remap($CI_BRANCH, "main", production, regex(".*"), preview, undefined, development)
+APP_ENV=remap($CI_BRANCH, "main", production, glob("*"), preview, undefined, development)
 ```
 
 :::caution[Quoting path-like values]
@@ -154,7 +154,33 @@ API_URL=ifs(
 </div>
 
 <div>
+### `glob()`
+
+Creates a glob pattern, for use as a [`remap()`](#remap) match value. The pattern must match the whole value: `*` matches any run of characters (including none) and `?` matches one character. Every other character matches itself, and matching is case-sensitive. A value containing a line break never matches.
+
+- Takes one argument, the pattern, as a static string.
+- Matching takes time proportional to the pattern length times the value length, so no pattern can be slow.
+
+```env-spec
+# anything that is not "main" is a preview
+APP_ENV=remap($CI_BRANCH, "main", production, glob("*"), preview, undefined, development)
+
+# branch names containing "preview"
+DEPLOY_TARGET=remap($CI_BRANCH, glob("*preview*"), preview, glob("release-*"), staging, dev)
+```
+</div>
+
+<div>
 ### `regex()`
+
+:::caution[Deprecated]
+`regex()` still works, but now produces a warning, and a future major version will remove it. Regexes are easy to get subtly wrong, hide what they check, and some patterns take seconds to run on short values (`^(a+)+$`). Use these instead:
+- on a data type: the [string rules](/reference/data-types#string-rules) (`startsWith`, `notStartsWith`, `contains`, `chars`, `isLength`, ...)
+- in `remap()`: [`glob()`](#glob) or an exact value
+- in [`@auditExtraPatterns()`](/reference/root-decorators/#auditextrapatterns): `calls=[...]` or `props=[...]`
+
+The warning shows a replacement when the pattern is simple enough to translate.
+:::
 
 Creates a regular expression, for use as a [`remap()`](#remap) match value or as the `matches` option of a [data type](/reference/data-types).
 
