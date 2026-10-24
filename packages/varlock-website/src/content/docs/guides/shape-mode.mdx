@@ -5,7 +5,7 @@ description: Load a schema for editors, linters, and type checkers while skippin
 
 Loading a schema normally does real work. `exec()` runs a shell command, plugin resolvers call secret stores, `@cache` opens an encrypted cache, root decorators like `@setValuesBulk` and plugin `@init*` decorators run, and a pinned plugin that isn't installed is downloaded from npm. That is what you want when running an app, but not when a tool only needs to read the schema: a type checker, a language server, or a CI lint.
 
-Shape mode builds the graph (items, types, decorators, requiredness, sensitivity, errors) without running any of that. It is a programmatic API for tool authors. [`varlock codegen --shape`](/guides/code-generation/#generating-without-running-schema-commands) and `varlock codegen --watch` use it from the CLI. To check your own env, use [`varlock load`](/reference/cli/load-and-run/#load).
+Shape mode builds the graph (items, types, decorators, requiredness, sensitivity, errors) without running any of that. It is a programmatic API for tool authors. [`varlock codegen`](/guides/code-generation/#what-codegen-runs) uses it from the CLI. To check your own env, use [`varlock load`](/reference/cli/load-and-run/#load).
 
 :::caution[Installed plugins still run]
 Shape mode skips `exec()`, other resolvers with side effects, and root decorator execution, and it never downloads a plugin. A plugin that is already installed or cached is still imported, and its module code and `process()` hooks run. See [Limits](#limits).

@@ -108,8 +108,9 @@ async function generateTsFile(ctx: CodeGenContext): Promise<string> {
   // process.env augmentation drops its optionality (graph-level flag, not a decorator arg)
   options.injectUndefinedAsEmpty = ctx.graph.injectUndefinedAsEmpty;
   options.pluginIcons = ctx.graph.bundledIcons;
-  // a shape-mode graph never touches the network, so custom icons that are not bundled or cached are left out
-  options.fetchIcons = ctx.graph.mode !== 'shape';
+  // a shape-mode graph only touches the network when downloads were allowed (codegen); otherwise custom icons
+  // that are not bundled or cached are left out
+  options.fetchIcons = ctx.graph.mode !== 'shape' || ctx.graph.userCommand;
 
   return generateTsTypesSrc(ctx.fields, options);
 }

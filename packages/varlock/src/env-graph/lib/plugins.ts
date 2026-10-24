@@ -908,7 +908,7 @@ export async function processPluginInstallDecorators(dataSource: EnvGraphDataSou
             // This keeps loads fast and lets pre-cached plugins work offline.
             const expectedTarballUrl = getNpmTarballUrl(moduleName, versionDescriptor);
             pluginSrcPath = await getCachedPluginDir(expectedTarballUrl);
-            if (!pluginSrcPath && graph.mode === 'shape') {
+            if (!pluginSrcPath && graph.mode === 'shape' && !graph.userCommand) {
               graph.shapeSkipped.push({ kind: 'pluginDownload', name: `${moduleName}@${versionDescriptor}` });
               throw new SchemaError(`Plugin "${moduleName}@${versionDescriptor}" is not installed or cached, and shape mode never downloads plugins`, {
                 location: getErrorLocation(dataSource, pluginDecorator),

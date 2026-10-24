@@ -60,6 +60,7 @@ function loadFromPaths(
     clearCache?: boolean,
     skipCache?: boolean,
     mode?: 'default' | 'shape',
+    userCommand?: boolean,
     proxyResolutionView?: ProxyResolutionView,
   },
 ) {
@@ -89,6 +90,7 @@ function loadFromPaths(
     clearCache: config.clearCache,
     skipCache: config.skipCache,
     mode: config.mode,
+    userCommand: config.userCommand,
     afterInit: async (g) => {
       g.registerResolver(VarlockResolver);
       g.registerResolver(KeychainResolver);
@@ -113,6 +115,8 @@ export async function loadVarlockEnvGraph(opts?: {
    * the schema. See the shape mode guide.
    */
   mode?: 'default' | 'shape',
+  /** shape mode only: see `EnvGraph.userCommand` */
+  userCommand?: boolean,
   /**
    * Skip the proxy schema-fingerprint guard for this load. Used by the `proxy`
    * command itself (it manages the session fingerprint directly), so that
@@ -159,6 +163,7 @@ export async function loadVarlockEnvGraph(opts?: {
         clearCache: opts?.clearCache,
         skipCache: opts?.skipCache,
         mode: opts?.mode,
+        userCommand: opts?.userCommand,
         proxyResolutionView,
       });
     }
@@ -177,6 +182,7 @@ export async function loadVarlockEnvGraph(opts?: {
         clearCache: opts?.clearCache,
         skipCache: opts?.skipCache,
         mode: opts?.mode,
+        userCommand: opts?.userCommand,
         proxyResolutionView,
       });
     }
@@ -190,6 +196,7 @@ export async function loadVarlockEnvGraph(opts?: {
       clearCache: opts?.clearCache,
       skipCache: opts?.skipCache,
       mode: opts?.mode,
+      userCommand: opts?.userCommand,
       afterInit: async (g) => {
         g.registerResolver(VarlockResolver);
         g.registerResolver(KeychainResolver);

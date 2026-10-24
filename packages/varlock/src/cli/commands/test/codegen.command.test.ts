@@ -6,10 +6,11 @@ import os from 'node:os';
 import path from 'node:path';
 import outdent from 'outdent';
 import { commandFn } from '../codegen.command';
+import { loadVarlockEnvGraph } from '../../../lib/load-graph';
 
-// `varlock codegen --shape` must not run anything a schema asks for. Each side-effect test has a
-// positive control: the same schema through plain `varlock codegen` does perform the side effect,
-// so a passing shape-mode test can't come from a probe that never fires.
+// `varlock codegen` must not run anything a schema asks for. Each side-effect test has a positive
+// control: the same schema through a full load (what `varlock load` does) performs the side effect,
+// so a passing test can't come from a probe that never fires.
 
 let dir: string;
 
@@ -35,8 +36,14 @@ function write(files: Record<string, string>) {
 
 const read = (name: string) => fs.readFileSync(path.join(dir, name), 'utf-8');
 
-async function codegen(values: { shape?: boolean } = {}, fn: typeof commandFn = commandFn) {
-  await fn({ values: { path: [dir], ...values } } as any);
+async function codegen(fn: typeof commandFn = commandFn) {
+  await fn({ values: { path: [dir] } } as any);
+}
+
+/** Generate from a full load, the way codegen worked before it switched to shape mode. */
+async function fullLoadCodegen(load: typeof loadVarlockEnvGraph = loadVarlockEnvGraph) {
+  const graph = await load({ entryFilePaths: [dir], mode: 'default' });
+  await graph.runCodeGeneratorsIfNeeded({ ignoreAutoFalse: true });
 }
 
 // A command that creates `marker` and prints `out`. Uses node rather than touch/echo so it also runs
@@ -46,7 +53,7 @@ const touchCmd = (marker: string, out: string) => {
   return `node -e "require('fs').writeFileSync('${m}', ''); process.stdout.write('${out}')"`;
 };
 
-describe('varlock codegen --shape', () => {
+describe('varlock codegen', () => {
   test('shell commands in root decorators never run', async () => {
     const cacheMarker = path.join(dir, 'MARKER_CACHE');
     const bulkMarker = path.join(dir, 'MARKER_BULK');
@@ -60,14 +67,14 @@ describe('varlock codegen --shape', () => {
       `,
     });
 
-    await codegen({ shape: true });
+    await codegen();
     expect(fs.existsSync(cacheMarker)).toBe(false);
     expect(fs.existsSync(bulkMarker)).toBe(false);
     expect(read('env.d.ts')).toContain('A: string');
 
-    // control: plain codegen runs both
+    // control: a full load runs both
     fs.rmSync(path.join(dir, 'env.d.ts'));
-    await codegen();
+    await fullLoadCodegen();
     expect(fs.existsSync(cacheMarker)).toBe(true);
     expect(fs.existsSync(bulkMarker)).toBe(true);
   });
@@ -82,12 +89,12 @@ describe('varlock codegen --shape', () => {
         TOKEN=exec(\`${touchCmd(marker, '3000')}\`)
       `,
     });
-    await codegen({ shape: true });
+    await codegen();
     expect(fs.existsSync(marker)).toBe(false);
     expect(read('env.d.ts')).toContain('TOKEN: number');
   });
 
-  test('a custom @icon is not downloaded', async () => {
+  test('a custom @icon is still downloaded, so the output does not change', async () => {
     const fetchMock = vi.fn(async () => new Response('<svg fill="currentColor"></svg>', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     // unique name so the module-level and /tmp icon caches from other tests can't hide the fetch
@@ -101,15 +108,11 @@ describe('varlock codegen --shape', () => {
       `,
     });
 
-    await codegen({ shape: true });
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(read('env.d.ts')).toContain('A: string');
-    expect(read('env.d.ts')).not.toContain('![icon]');
-
-    // control: plain codegen downloads it (and caches it on disk, which we clean up)
     await codegen();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(read('env.d.ts')).toContain('A: string');
     expect(read('env.d.ts')).toContain('![icon]');
+    // (it is cached on disk, which we clean up)
     fs.rmSync(`/tmp/varlock-icon-cache/${icon}-20.svg`, { force: true });
   });
 
@@ -125,7 +128,7 @@ describe('varlock codegen --shape', () => {
         APP_URL=https://example.com
       `,
     });
-    await codegen({ shape: true });
+    await codegen();
     expect(read('env.d.ts')).toContain('![icon]');
   });
 
@@ -141,19 +144,38 @@ describe('varlock codegen --shape', () => {
     });
 
     // the graph snapshots process.env when its module loads, so load the command fresh under each env
-    const codegenUnderEnv = async (appEnv: string, values: { shape?: boolean }) => {
+    const underEnv = async (appEnv: string, full = false) => {
       vi.stubEnv('APP_ENV', appEnv);
       vi.resetModules();
-      await codegen(values, (await import('../codegen.command')).commandFn);
+      if (full) await fullLoadCodegen((await import('../../../lib/load-graph')).loadVarlockEnvGraph);
+      else await codegen((await import('../codegen.command')).commandFn);
       return read('env.d.ts');
     };
 
-    const devOutput = await codegenUnderEnv('dev', { shape: true });
-    expect(await codegenUnderEnv('prod', { shape: true })).toBe(devOutput);
+    const devOutput = await underEnv('dev');
+    expect(await underEnv('prod')).toBe(devOutput);
 
-    // control: plain codegen follows the shell
-    expect(await codegenUnderEnv('dev', {})).toBe(devOutput);
-    expect(await codegenUnderEnv('prod', {})).not.toBe(devOutput);
+    // control: a full load follows the shell
+    expect(await underEnv('dev', true)).toBe(devOutput);
+    expect(await underEnv('prod', true)).not.toBe(devOutput);
+  });
+
+  test('writes outside the schema folder like a full load (a monorepo sharing types)', async () => {
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), 'varlock-codegen-other-'));
+    try {
+      const rel = path.relative(dir, path.join(other, 'env.d.ts')).replace(/\\/g, '/');
+      write({
+        '.env.schema': outdent`
+          # @generateTsTypes(path=${rel})
+          # ---
+          A=a
+        `,
+      });
+      await codegen();
+      expect(fs.readFileSync(path.join(other, 'env.d.ts'), 'utf-8')).toContain('A: string');
+    } finally {
+      fs.rmSync(other, { recursive: true, force: true });
+    }
   });
 
   test('schema errors still fail the command and write nothing', async () => {
@@ -165,13 +187,13 @@ describe('varlock codegen --shape', () => {
         A=1
       `,
     });
-    await expect(codegen({ shape: true })).rejects.toThrow('Schema error');
+    await expect(codegen()).rejects.toThrow('Schema error');
     expect(fs.existsSync(path.join(dir, 'env.d.ts'))).toBe(false);
   });
 });
 
 // Schemas that exercise the parts of the output that come from the graph. Generated files must be
-// byte-identical between plain codegen and `--shape`.
+// byte-identical between codegen and generating from a full load.
 const PARITY_SCHEMAS: Record<string, Record<string, string>> = {
   'types, sensitivity and requiredness': {
     '.env.schema': outdent`
@@ -262,21 +284,21 @@ const PARITY_SCHEMAS: Record<string, Record<string, string>> = {
   },
 };
 
-describe('varlock codegen --shape output', () => {
-  test.each(Object.keys(PARITY_SCHEMAS))('matches plain codegen: %s', async (name) => {
+describe('varlock codegen output', () => {
+  test.each(Object.keys(PARITY_SCHEMAS))('matches a full load: %s', async (name) => {
     write(PARITY_SCHEMAS[name]);
     const listOutputs = () => fs.readdirSync(dir, { recursive: true, encoding: 'utf-8' })
       .filter((f) => !fs.statSync(path.join(dir, f)).isDirectory())
       .filter((f) => !Object.keys(PARITY_SCHEMAS[name]).includes(f))
       .sort();
 
-    await codegen();
+    await fullLoadCodegen();
     const outputs = listOutputs();
     expect(outputs.length).toBeGreaterThan(0);
     const expected = Object.fromEntries(outputs.map((f) => [f, read(f)]));
     for (const f of outputs) fs.rmSync(path.join(dir, f));
 
-    await codegen({ shape: true });
+    await codegen();
     expect(listOutputs()).toEqual(outputs);
     expect(Object.fromEntries(outputs.map((f) => [f, read(f)]))).toEqual(expected);
   });

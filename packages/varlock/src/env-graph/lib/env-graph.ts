@@ -231,6 +231,13 @@ export class EnvGraph {
    * is recorded in `shapeSkipped`.
    */
   readonly mode: 'default' | 'shape' = 'default';
+  /**
+   * shape mode only: the user ran a command on their own project (`varlock codegen`). It still runs no `exec()`,
+   * root decorator commands or secret stores, but downloads and writes the way a full load does: a
+   * `@plugin(name@version)` that is not cached yet and custom `@icon` images are downloaded, and generated files go
+   * where the schema says, even outside the project (a monorepo writing types into another package).
+   */
+  readonly userCommand: boolean = false;
   shapeSkipped: Array<{
     kind: 'resolver' | 'rootDecoratorExecute' | 'cacheStore' | 'pluginDownload' | 'codegenWrite',
     name: string,
@@ -490,8 +497,9 @@ export class EnvGraph {
     this.codeGeneratorsRegistry[name] = generatorDef;
   }
 
-  constructor(opts?: { mode?: 'default' | 'shape' }) {
+  constructor(opts?: { mode?: 'default' | 'shape', userCommand?: boolean }) {
     if (opts?.mode) this.mode = opts.mode;
+    if (opts?.userCommand) this.userCommand = true;
     // register base data types (string, number, boolean, etc)
     for (const dataType of BaseDataTypes) {
       this.registerDataType(dataType);
@@ -1469,8 +1477,9 @@ export class EnvGraph {
           : process.cwd();
         const outputPath = path.resolve(sourceDir, settings.obj.path);
         // shape mode reads schemas nobody has reviewed: a schema must not be able to write outside the project
-        // it was loaded from (`path=../..`, an absolute path, or a symlink pointing out of it)
-        if (this.mode === 'shape' && !await this.isWritableInShapeLoad(outputPath)) {
+        // it was loaded from (`path=../..`, an absolute path, or a symlink pointing out of it). A command the user
+        // ran on their own project writes where the schema says, as a full load does.
+        if (this.mode === 'shape' && !this.userCommand && !await this.isWritableInShapeLoad(outputPath)) {
           this.shapeSkipped.push({ kind: 'codegenWrite', name: outputPath });
           throw new SchemaError(`@${decoratorName} - in shape mode, \`path\` must stay inside the project (${outputPath})`);
         }

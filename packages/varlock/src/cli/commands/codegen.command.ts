@@ -76,10 +76,19 @@ function reportError(err: unknown) {
 }
 
 /**
- * `varlock codegen --watch`: regenerate whenever the schema or a file it imports changes. Always loads
- * in shape mode, because it runs on every save and must never execute schema commands or reach
- * a secret store. A schema that does not load (a half-typed edit) is reported and the generated files
- * are left as they were, then the watcher keeps going.
+ * Codegen only needs the schema's shape, never its values, so it always loads in shape mode: no
+ * `exec()`, root decorator commands or secret stores, and the shell's env does not change the output.
+ * Downloads and writes work as they always have (a `@plugin(name@version)` that is not cached yet, custom
+ * `@icon` images, output paths outside the project), so a fresh CI checkout and a monorepo keep working.
+ */
+function loadForCodegen(entryFilePaths?: Array<string>) {
+  return loadVarlockEnvGraph({ entryFilePaths, mode: 'shape', userCommand: true });
+}
+
+/**
+ * `varlock codegen --watch`: regenerate whenever the schema or a file it imports changes. A schema
+ * that does not load (a half-typed edit) is reported and the generated files are left as they were,
+ * then the watcher keeps going.
  */
 export function startCodegenWatch(opts: {
   entryFilePaths?: Array<string>,
@@ -107,7 +116,7 @@ export function startCodegenWatch(opts: {
     isFirstRun = false;
     let envGraph: EnvGraph;
     try {
-      envGraph = await loadVarlockEnvGraph({ entryFilePaths: opts.entryFilePaths, mode: 'shape' });
+      envGraph = await loadForCodegen(opts.entryFilePaths);
     } catch (err) {
       reportError(err);
       log(`${ansis.yellow('Generated files were not changed.')} ${waiting}`);
@@ -160,10 +169,7 @@ export const commandFn: TypedGunshiCommandFn<typeof commandSpec> = async (ctx) =
     return;
   }
 
-  const envGraph = await loadVarlockEnvGraph({
-    entryFilePaths: ctx.values.path,
-    mode: ctx.values.shape ? 'shape' : 'default',
-  });
+  const envGraph = await loadForCodegen(ctx.values.path);
   checkGraph(envGraph);
   await generateFromGraph(envGraph);
 

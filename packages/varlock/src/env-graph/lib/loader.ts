@@ -30,9 +30,11 @@ export async function loadEnvGraph(opts?: {
    * `overrideValues` is ignored, since shape mode never reads item values from the environment.
    */
   mode?: 'default' | 'shape',
+  /** see `EnvGraph.userCommand` */
+  userCommand?: boolean,
   afterInit?: (graph: EnvGraph) => Promise<void>,
 }) {
-  const graph = new EnvGraph({ mode: opts?.mode });
+  const graph = new EnvGraph({ mode: opts?.mode, userCommand: opts?.userCommand });
   const isShapeLoad = graph.mode === 'shape';
   if (opts?.overrideValues && !isShapeLoad) graph.overrideValues = opts.overrideValues;
   if (opts?.processEnvOverride) graph.processEnvOverride = opts.processEnvOverride;

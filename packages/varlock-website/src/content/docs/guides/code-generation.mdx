@@ -71,23 +71,16 @@ Set `auto=false` on any generator to skip it during `load`/`run`, then regenerat
 # @generateTsTypes(path=./env.d.ts, auto=false)
 ```
 
-## Generating without running schema commands
+## What codegen runs
 
-`varlock codegen` loads your schema the same way `varlock load` does, so shell commands in root decorators (for example `@cache=exec(...)` or `@setValuesBulk(exec(...))`) run. To generate without that, for example from a schema you haven't reviewed or in a step that shouldn't touch secret stores, pass `--shape`:
+Codegen only needs the shape of your schema (items, types, requiredness, sensitivity), never its values. So `varlock codegen` loads the schema in [shape mode](/guides/shape-mode/): it skips `exec()` and other resolvers with side effects, root decorator commands like `@cache=exec(...)` or `@setValuesBulk(exec(...))`, secret providers, and the cache, and env vars set in your shell don't change the output. That makes it safe to run on a schema you haven't reviewed, or in a CI step that shouldn't touch secret stores.
 
-```bash
-varlock codegen --shape
-```
+Downloads and writes work like a normal load: a pinned `@plugin(name@version)` that isn't cached yet is downloaded, custom `@icon` images are fetched, and generated files go where `path` says, even outside the schema's folder (for example a monorepo that writes types into another package).
 
-This loads the schema in [shape mode](/guides/shape-mode/). It skips `exec()` and other resolvers with side effects, root decorator commands like `@setValuesBulk`, secret providers, and the cache. It never downloads a plugin, and it doesn't download custom `@icon` images, so an icon that isn't bundled with varlock or a plugin (or already cached on disk) is left out of the generated comments. Env vars set in your shell no longer override item values.
-
-For most schemas the generated files are identical to a normal `varlock codegen`. They can differ when something in the schema depends on a value that shape mode skips or ignores, such as a generator option set from an env var (`processEnv=if(forEnv(prod), none, strict)`), or an item created at load time by `@setValuesBulk(..., createMissing=true)`. See [what changes](/guides/shape-mode/#what-changes).
-
-Generated files must stay inside the directory the schema was loaded from. A `path` that leads out of it (through `../`, an absolute path elsewhere, or a symlink) is a schema error under `--shape` and `--watch` instead of a write, so in a monorepo where one schema writes types into another package, run a normal `varlock codegen` for that step.
-
-Limits:
-- A plugin that is already installed is still imported, its resolver hooks run, and generators that plugins register run. `--shape` is not a sandbox for plugins you don't trust.
-- [Builtin variables](/reference/builtin-variables/) are computed from an empty environment instead of your shell's: `VARLOCK_ENV` is `development`, `VARLOCK_IS_CI` is `false`, CI values such as `VARLOCK_COMMIT_SHA` are not set, and `VARLOCK_BRANCH` is unknown. An option that depends on one of them gets the value it would get locally outside CI, even when codegen runs in CI.
+Things to know:
+- Plugins still load, their resolver hooks run, and generators that plugins register run. Codegen is not a sandbox for plugins you don't trust.
+- An item created at load time by `@setValuesBulk(..., createMissing=true)` is not in the generated output, since the command that would create it doesn't run.
+- [Builtin variables](/reference/builtin-variables/) are computed from an empty environment instead of your shell's: `VARLOCK_ENV` is `development`, `VARLOCK_IS_CI` is `false`, CI values such as `VARLOCK_COMMIT_SHA` are not set, and `VARLOCK_BRANCH` is unknown. A generator option that depends on one of them, or on another env var (`processEnv=if(forEnv(prod), none, strict)`), gets the same value on every machine.
 
 ## Watching for changes
 
@@ -95,7 +88,7 @@ Limits:
 varlock codegen --watch
 ```
 
-Generates once, then regenerates every time the schema or a file it imports is saved. It implies `--shape`, so it never runs shell commands or reaches a secret store on a save. If the schema doesn't load while you are typing (a parse error, an unknown decorator), the errors are printed, the generated files stay as they were, and the next valid save regenerates them. If a generator itself fails (for example a bad option), files written before it in that run may already have been updated. An `@import` of a file that doesn't exist yet is watched too, as long as its directory exists. Press Ctrl+C to stop.
+Generates once, then regenerates every time the schema or a file it imports is saved. Like a single run, it never runs shell commands or reaches a secret store. If the schema doesn't load while you are typing (a parse error, an unknown decorator), the errors are printed, the generated files stay as they were, and the next valid save regenerates them. If a generator itself fails (for example a bad option), files written before it in that run may already have been updated. An `@import` of a file that doesn't exist yet is watched too, as long as its directory exists. Press Ctrl+C to stop.
 
 ## Extending with plugins
 

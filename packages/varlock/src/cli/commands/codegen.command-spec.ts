@@ -10,13 +10,9 @@ export const commandSpec = define({
       multiple: true,
       description: 'Path to a specific .env file or directory to use as the entry point (can be specified multiple times)',
     },
-    shape: {
-      type: 'boolean',
-      description: 'Load the schema in shape mode: skip exec() and other resolvers with side effects, root decorator commands, secret providers, plugin downloads and network requests',
-    },
     watch: {
       type: 'boolean',
-      description: 'Regenerate whenever the schema or a file it imports changes (implies --shape)',
+      description: 'Regenerate whenever the schema or a file it imports changes',
     },
   },
   examples: `
@@ -34,19 +30,15 @@ Add a per-language decorator to your schema for each output you want:
 This is useful when you have \`auto=false\` set on a generator decorator to
 disable automatic generation during \`varlock load\` or \`varlock run\`.
 
-By default the schema is loaded like \`varlock load\` does, so shell commands in
-root decorators (for example @cache=exec(...) or @setValuesBulk(exec(...))) run.
---shape loads it in shape mode instead: exec() and other resolvers with side
-effects, root decorator commands, secret providers, plugin downloads and network
-requests (such as custom icon downloads) are skipped, and env vars set in your shell
-no longer override item values. Plugins that are already installed are still
-loaded and their code runs. --watch implies --shape, and while the schema has
-errors it leaves the generated files as they were.
+Codegen only reads the shape of your schema, never its values: exec() and other
+commands and secret providers are skipped, and env vars set in your shell don't
+change the output. Plugins are still loaded (and downloaded if a pinned version
+isn't cached yet), and their code runs. While the schema has errors, --watch
+leaves the generated files as they were.
 
 Examples:
   varlock codegen                    # Generate using the default schema
   varlock codegen --path .env.prod   # Generate from a specific .env file
-  varlock codegen --shape         # Generate without running exec() or other resolvers
   varlock codegen --watch            # Regenerate on every change to the schema
 `.trim(),
 });
