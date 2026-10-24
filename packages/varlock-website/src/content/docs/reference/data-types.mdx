@@ -136,7 +136,7 @@ These options check the value with plain string operations. They are shared by `
 - `chars` (preset or list): The characters the value may contain. Either a preset name, or a list mixing preset names and strings whose every character is allowed. A list entry that is not a preset name is read as literal characters. An empty value passes. The error names the first character that is not allowed and its position
   - `digits` (0-9), `hex` (0-9, a-f, A-F), `lowercase` (a-z), `uppercase` (A-Z), `letters` (a-z, A-Z), `alphanumeric` (letters and digits), `base64` (letters, digits, `+`, `/`, `=`), `base64url` (letters, digits, `-`, `_`, no padding)
 
-An empty string or empty list sets no rule. Values can come from other functions, e.g. `startsWith=if(forEnv(production), "sk_live_", "sk_test_")`.
+An empty string or empty list sets no rule, except for `chars`, where an empty list is an error (use `undefined` to turn the rule off, e.g. inside `if()`). Values can come from other functions, e.g. `startsWith=if(forEnv(production), "sk_live_", "sk_test_")`.
 
 ```env-spec
 # @type=string(chars=hex, isLength=32)
