@@ -619,7 +619,7 @@ To silence the other direction, a declared item that is not referenced in code, 
 
 Teaches the [`varlock audit`](/reference/cli/encryption/#audit) code scanner your own env access idioms, for code that reaches env vars through a wrapper the built-in patterns don't cover (e.g. NestJS `configService.get('KEY')`). _Can be called multiple times; the rules are merged additively._
 
-- `calls=[name, ...]`: the key is a string-literal argument of a call to one of these functions or methods, e.g. `calls=[requireEnv]` finds `requireEnv("API_KEY")` and `config.requireEnv('API_KEY')`
+- `calls=[name, ...]`: the key is a string-literal argument of a call to one of these functions or methods, e.g. `calls=[requireEnv]` finds `requireEnv("API_KEY")` and `config.requireEnv('API_KEY')`. A dotted name like `calls=[configService.get]` only matches calls ending in that chain (`this.configService.get('API_KEY')`), and TypeScript type arguments (`get<string>('API_KEY')`) are allowed
 - `arg=N`: which argument of those calls holds the key, counting from 1 (default 1)
 - `props=[name, ...]`: the key is a string literal assigned to one of these properties, written as `name: "KEY"`, `"name": "KEY"` or `name = "KEY"`
 - `fileTypes=[...]`: see [below](#scoping-patterns-to-file-types)
@@ -638,7 +638,7 @@ API_KEY=
 The scanner reads the code with a small lexer, so a name inside a string or a comment is not mistaken for a call, nested calls and several calls on one line are all found, and a call whose argument is not a plain string literal (a variable, or a template literal with `${...}`) is skipped. Only string literals shaped like an env key (letters, digits and `_`, not starting with a digit) are reported. Single, double and backtick quotes are all read.
 
 :::caution[Deprecated: regex patterns]
-Passing [`regex()`](/reference/functions#regex) patterns, where the first capture group is the env key, still works but produces a warning, and a future major version will remove it. (A quoted `'/.../flags'` string is accepted the same way.) Replace `regex('config\.get\(\s*\'([A-Z_]+)\'\)')` with `calls=[get]`, or `props=[...]` for an assignment.
+Passing [`regex()`](/reference/functions#regex) patterns, where the first capture group is the env key, still works but produces a warning, and a future major version will remove it. (A quoted `'/.../flags'` string is accepted the same way.) Replace `regex('config\.get\(\s*\'([A-Z_]+)\'\)')` with `calls=[config.get]`, or `props=[...]` for an assignment.
 :::
 
 #### Scoping patterns to file types
@@ -649,9 +649,9 @@ Pass `fileTypes=[...]` to restrict the patterns in that call to certain file ext
 
 ```env-spec
 # a NestJS idiom, TypeScript only
-# @auditExtraPatterns(calls=[get], fileTypes=[ts, tsx])
+# @auditExtraPatterns(calls=[configService.get], fileTypes=[ts, tsx])
 # terraform and helm, which the scanner would not otherwise read
-# @auditExtraPatterns(calls=[cfg_get], fileTypes=[tf, yaml])
+# @auditExtraPatterns(calls=[cfg.get], fileTypes=[tf, yaml])
 # no fileTypes: applies to every recognized source file
 # @auditExtraPatterns(calls=[inc])
 # ---

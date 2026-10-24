@@ -179,11 +179,11 @@ Values are interpreted similarly for config item values, decorator values, and v
 
 @env-spec has no regex literal. A value like `/pattern/` is an ordinary string, so it follows the [normal unquoted value rules](#unquoted-values) and can be a path or any other text without special treatment.
 
-Tools built on @env-spec take a pattern through a function call instead. In varlock that is `regex("pattern", "flags")`: the pattern is a quoted string, so commas, spaces and slashes inside it need no escaping, and flags are an optional second argument. See [`regex()`](/reference/functions#regex).
+Tools built on @env-spec take a pattern through a function call instead. In varlock that is [`glob("pattern")`](/reference/functions#glob) for `remap()` match values, and [string rules](/reference/data-types#string-rules) like `startsWith` and `chars` for checking a value. The pattern is a quoted string, so commas, spaces and slashes inside it need no escaping. (Varlock's [`regex("pattern", "flags")`](/reference/functions#regex) still works but is deprecated.)
 
 ```env-spec
-ITEM=fn(regex("^dev.*", "i"), dev, "production", prod)
-# @type=string(matches=regex("^sk-[a-zA-Z0-9]+$"))
+ITEM=fn(glob("dev*"), dev, "production", prod)
+# @type=string(startsWith="sk-", chars=[alphanumeric, "-"])
 API_KEY=
 ```
 
@@ -249,7 +249,7 @@ Do **not** wrap a function's (or function-decorator's) own named arguments in a 
 
 Also prefer the existing positional/comma forms for:
 
-- **ordered pairs**: `ifs(cond1, val1, cond2, val2, default)` and `remap($VAR, match1, result1, ...)` read like a spreadsheet `IFS()`/lookup and stay flat. Crucially, `remap` match keys may be **regexes or non-identifier strings**, which cannot be object keys (keys must match `/[a-zA-Z][a-zA-Z0-9_]*/`), so an object would be strictly less expressive.
+- **ordered pairs**: `ifs(cond1, val1, cond2, val2, default)` and `remap($VAR, match1, result1, ...)` read like a spreadsheet `IFS()`/lookup and stay flat. Crucially, `remap` match keys may be **glob patterns or non-identifier strings**, which cannot be object keys (keys must match `/[a-zA-Z][a-zA-Z0-9_]*/`), so an object would be strictly less expressive.
 - **value lists**: `@type=enum(dev, staging, prod)` already reads as a list; `enum([...])` only adds brackets.
 
 #### Multi-line literals
