@@ -337,20 +337,31 @@ export class EnvGraph {
    * True once finishLoad has fully completed. The structure getters below (and ConfigItem.defs) are hit thousands
    * of times per load on large schemas, so from then on they are memoized. Root decorators still change definitions
    * until the very end of finishLoad (e.g. @setValuesBulk adds defs and replaces resolvers), and nothing changes the
-   * source tree or item definitions after it, so any later change to them would need to clear these memos.
+   * source tree or item definitions after it, so any later change to them would need to clear `_structureMemos`.
    */
   _loadSettled = false;
-  private _sortedDataSourcesMemo?: Array<EnvGraphDataSource>;
-  private _sortedDefinitionSourcesMemo?: Array<DefinitionSourceEntry>;
+  private _structureMemos = new Map<unknown, unknown>();
+
+  /**
+   * Returns the memoized value for `key` if there is one, otherwise computes it, keeping it only once the load has
+   * settled. This is the one place that decides when the structure memos start.
+   */
+  _memoStructure<T>(key: unknown, compute: () => T): T {
+    const memo = this._structureMemos.get(key);
+    if (memo !== undefined) return memo as T;
+    const value = compute();
+    if (this._loadSettled) this._structureMemos.set(key, value);
+    return value;
+  }
+
 
   get sortedDataSources() {
-    if (this._sortedDataSourcesMemo) return this._sortedDataSourcesMemo;
-    function getSourceAndChildren(s: EnvGraphDataSource): Array<EnvGraphDataSource> {
-      return [s, ...s.children ? s.children.flatMap(getSourceAndChildren) : []];
-    }
-    const value = this.rootDataSource ? getSourceAndChildren(this.rootDataSource) : [];
-    if (this._loadSettled) this._sortedDataSourcesMemo = value;
-    return value;
+    return this._memoStructure('sortedDataSources', () => {
+      function getSourceAndChildren(s: EnvGraphDataSource): Array<EnvGraphDataSource> {
+        return [s, ...s.children ? s.children.flatMap(getSourceAndChildren) : []];
+      }
+      return this.rootDataSource ? getSourceAndChildren(this.rootDataSource) : [];
+    });
   }
 
   /**
@@ -365,23 +376,21 @@ export class EnvGraph {
    * the original source's full subtree at the alias's precedence position.
    */
   get sortedDefinitionSources(): Array<DefinitionSourceEntry> {
-    if (this._sortedDefinitionSourcesMemo) return this._sortedDefinitionSourcesMemo;
-    const result: Array<DefinitionSourceEntry> = [];
-
-    for (const source of this.sortedDataSources) {
-      if (source instanceof ImportAliasSource) {
-        // Alias: expand to the original source's subtree at this position, applying the
-        // alias node's import chain (its own filter + the importing context) for visibility.
-        for (const descendant of this._getDescendants(source.original)) {
-          result.push({ source: descendant, filterNode: source });
+    return this._memoStructure('sortedDefinitionSources', () => {
+      const result: Array<DefinitionSourceEntry> = [];
+      for (const source of this.sortedDataSources) {
+        if (source instanceof ImportAliasSource) {
+          // Alias: expand to the original source's subtree at this position, applying the
+          // alias node's import chain (its own filter + the importing context) for visibility.
+          for (const descendant of this._getDescendants(source.original)) {
+            result.push({ source: descendant, filterNode: source });
+          }
+        } else {
+          result.push({ source, filterNode: source });
         }
-      } else {
-        result.push({ source, filterNode: source });
       }
-    }
-
-    if (this._loadSettled) this._sortedDefinitionSourcesMemo = result;
-    return result;
+      return result;
+    });
   }
 
   registeredResolverFunctions: Record<string, ResolverChildClass> = {};
@@ -895,17 +904,15 @@ export class EnvGraph {
     }
   }
 
-  private _graphAdjacencyListMemo?: GraphAdjacencyList;
   get graphAdjacencyList() {
     // item deps are fixed once loading has settled, and every caller only reads the result
-    if (this._graphAdjacencyListMemo) return this._graphAdjacencyListMemo;
-    const adjList: GraphAdjacencyList = {};
-    for (const itemKey in this.configSchema) {
-      const item = this.configSchema[itemKey];
-      adjList[itemKey] = item.dependencyKeys;
-    }
-    if (this._loadSettled) this._graphAdjacencyListMemo = adjList;
-    return adjList;
+    return this._memoStructure('graphAdjacencyList', () => {
+      const adjList: GraphAdjacencyList = {};
+      for (const itemKey in this.configSchema) {
+        adjList[itemKey] = this.configSchema[itemKey].dependencyKeys;
+      }
+      return adjList;
+    });
   }
 
   async resolveEnvValues(keys?: Array<string>): Promise<void> {

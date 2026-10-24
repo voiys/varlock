@@ -91,21 +91,20 @@ export class ConfigItem {
    * fetch ordered list of definitions for this item, by following the sorted definition sources list
    * internal defs (builtins) are appended last (lowest priority)
    */
-  private _defsMemo?: Array<ConfigItemDefAndSource>;
-  get defs() {
+  get defs(): Array<ConfigItemDefAndSource> {
     // dynamic while loading (early resolution of the envFlag, root decorators such as @setValuesBulk adding defs),
     // memoized once the load has settled
-    if (this._defsMemo) return this._defsMemo;
-    const defs: Array<ConfigItemDefAndSource> = [];
-    for (const { source, filterNode } of this.envGraph.sortedDefinitionSources) {
-      if (!source.configItemDefs[this.key]) continue;
-      if (source.disabled) continue;
-      if (filterNode && !filterNode.isKeyImported(this.key)) continue;
-      defs.push({ itemDef: source.configItemDefs[this.key], source });
-    }
-    defs.push(...this._internalDefs);
-    if (this.envGraph._loadSettled) this._defsMemo = defs;
-    return defs;
+    return this.envGraph._memoStructure(this, () => {
+      const defs: Array<ConfigItemDefAndSource> = [];
+      for (const { source, filterNode } of this.envGraph.sortedDefinitionSources) {
+        if (!source.configItemDefs[this.key]) continue;
+        if (source.disabled) continue;
+        if (filterNode && !filterNode.isKeyImported(this.key)) continue;
+        defs.push({ itemDef: source.configItemDefs[this.key], source });
+      }
+      defs.push(...this._internalDefs);
+      return defs;
+    });
   }
 
   /**
