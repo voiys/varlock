@@ -177,6 +177,7 @@ export abstract class EnvGraphDataSource {
   protected async _initChild(child: EnvGraphDataSource, importMeta?: EnvGraphDataSource['importMeta']) {
     if (!this.graph) throw new Error('expected graph to be set');
     this.children.unshift(child);
+    this.graph._structureVersion++;
     child.parent = this;
     child.graph = this.graph;
     if (importMeta) child.importMeta = importMeta;
@@ -357,6 +358,7 @@ export abstract class EnvGraphDataSource {
         return;
       }
       this._disabled = disabledVal;
+      if (this.graph) this.graph._structureVersion++;
       // track if @disable is conditional (non-static value like forEnv) for type generation
       if (disabledDec.decValueResolver && !disabledDec.decValueResolver.isStatic) {
         this._hasConditionalDisable = true;
