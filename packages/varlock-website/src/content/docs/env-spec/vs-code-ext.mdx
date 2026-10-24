@@ -15,7 +15,7 @@ The extension is available on the [VS Code Marketplace](https://marketplace.visu
 - IntelliSense for decorators, `@type` values, type options, resolver functions, and `$KEY` references
 - Enum value completion for item values below `@type=enum(...)`
 - Inline validation for invalid enum values, incompatible decorators, and obvious static `@type` mismatches
-- Hover info for common @decorators
+- Hover info for built-in @decorators
 - Comment continuation - automatically continue comment blocks when you hit enter within one
 
 ## IntelliSense and diagnostics
@@ -23,6 +23,8 @@ The extension is available on the [VS Code Marketplace](https://marketplace.visu
 ### Decorators and built-in types
 
 The extension suggests decorators and built-in `@type=` values directly inside comment blocks.
+
+Suggestions cover every built-in decorator, data type and resolver function in the varlock version the extension was released with, and hover shows docs for decorators. Names added by [plugins](/guides/plugins/) are not included.
 
 ![Decorator and type completion](/env-spec-vscode/autocomplete.gif)
 

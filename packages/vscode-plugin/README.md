@@ -14,7 +14,7 @@ This new DSL builds upon the common `.env` format, adding support for JSDoc styl
 - IntelliSense for decorators, `@type` values, type options, resolver functions, and `$KEY` references
 - Enum value completion for item values below `@type=enum(...)`
 - Inline validation for invalid enum values, incompatible decorators, and obvious static `@type` mismatches
-- Hover info for common `@decorators`
+- Hover info for built-in `@decorators`
 - Better toggle-comment behavior (CMD+/), to enable/disable decorators within comment blocks
 - Comment continuation (automatically continue comment blocks when you hit enter within one)
 
@@ -22,7 +22,9 @@ This new DSL builds upon the common `.env` format, adding support for JSDoc styl
 
 ### Decorators and built-in types
 
-Get completions for common item and root decorators, plus built-in `@type=` values while editing comment blocks.
+Get completions for item and root decorators, plus built-in `@type=` values while editing comment blocks.
+
+Suggestions cover every built-in decorator, data type and resolver function in the varlock version the extension was released with, and hover shows docs for decorators. Names added by plugins are not included.
 
 ![@env-spec decorator and type completion](./images/autocomplete.gif "Decorator and @type completion")
 
