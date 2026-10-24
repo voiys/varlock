@@ -71,7 +71,7 @@ varlock codegen [options]
 
 **Options:**
 - [Common options](/reference/cli-commands/#common-options): `--path` / `-p`
-- `--shape`: Load the schema in [shape mode](/guides/shape-mode/), so no `exec()`, secret provider, root decorator, plugin download, or network request runs, and `process.env` is ignored. See [Generating without running anything](/guides/code-generation/#generating-without-running-anything)
+- `--shape`: Load the schema in [shape mode](/guides/shape-mode/): `exec()` and other resolvers with side effects, root decorator commands, secret providers, plugin downloads, and network requests are skipped, and shell env vars no longer override item values. Installed plugins still load. See [Generating without running schema commands](/guides/code-generation/#generating-without-running-schema-commands)
 - `--watch`: Regenerate whenever the schema or a file it imports changes. Implies `--shape`. A schema that fails to load is reported and the generated files are left as they were. See [Watching for changes](/guides/code-generation/#watching-for-changes)
 
 **Examples:**

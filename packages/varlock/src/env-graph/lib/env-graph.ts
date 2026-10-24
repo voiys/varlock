@@ -275,6 +275,12 @@ export class EnvGraph {
    */
   private _loadedImportPaths = new Map<string, EnvGraphDataSource>();
 
+  /**
+   * Every file or directory path an `@import` tried to load, whether or not it exists (yet).
+   * Lets a watcher notice an import that is added before its file is created.
+   */
+  readonly attemptedImportPaths = new Set<string>();
+
   /** Returns the existing source for a path if already loaded, or undefined */
   getLoadedImportSource(importPath: string): EnvGraphDataSource | undefined {
     return this._loadedImportPaths.get(importPath);

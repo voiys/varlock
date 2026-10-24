@@ -42,6 +42,10 @@ const waitFor = async (check: () => boolean, ms = 5000) => {
 const start = async (entry = dir) => {
   watcher = startCodegenWatch({ entryFilePaths: [entry], debounceMs: 50, log: (msg) => logs.push(msg) });
   await watcher.idle();
+  // macOS reports a few events from just before a watch started and they cause one extra run: let that
+  // finish, so the files a test touches next are only noticed through the watches themselves
+  await sleep(400);
+  await watcher.idle();
 };
 
 const SCHEMA = (items: string) => outdent`
@@ -175,6 +179,44 @@ describe('codegen --watch', () => {
     write('.env.schema', schema('B=b'));
     await waitFor(() => output().includes('B: string'));
     for (const marker of markers) expect(fs.existsSync(marker)).toBe(false);
+  });
+
+  test('an @import of a file that does not exist yet is picked up once the file is created', async () => {
+    fs.mkdirSync(file('later'));
+    write('.env.schema', outdent`
+      # @generateTsTypes(path=env.d.ts)
+      # @import(./later/.env.added)
+      # ---
+      A=a
+    `);
+    await start();
+    expect(output()).toBe('');
+    expect(logs.some((l) => l.includes('Generated files were not changed'))).toBe(true);
+
+    write('later/.env.added', 'ADDED=1\n');
+    await waitFor(() => output().includes('ADDED'));
+  });
+
+  test('an entry file whose name does not start with .env is watched', async () => {
+    write('config.env', '# @generateTsTypes(path=env.d.ts)\n# ---\nA=a\n');
+    await start(file('config.env'));
+    expect(output()).toContain('A: string');
+    write('config.env', '# @generateTsTypes(path=env.d.ts)\n# ---\nA=a\nB=b\n');
+    await waitFor(() => output().includes('B: string'));
+  });
+
+  test('when a later generator fails, it does not claim the earlier files were left alone', async () => {
+    write('.env.schema', outdent`
+      # @generateTsTypes(path=first.d.ts)
+      # @generateTsTypes(path=second.d.ts, exposeEnv=local)
+      # ---
+      A=a
+    `);
+    await start();
+    // the first generator wrote before the second one threw
+    expect(fs.existsSync(file('first.d.ts'))).toBe(true);
+    expect(logs.some((l) => l.includes('files written before it may have changed'))).toBe(true);
+    expect(logs.some((l) => l.includes('Generated files were not changed'))).toBe(false);
   });
 
   test('stop() ends the watch', async () => {

@@ -612,6 +612,7 @@ export abstract class EnvGraphDataSource {
           }
 
           if (fullImportPath) {
+            this.graph.attemptedImportPaths.add(fullImportPath);
             const fileName = path.basename(fullImportPath);
 
             // TODO: might be nice to move this logic somewhere else

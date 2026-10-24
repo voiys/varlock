@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { watch as fsWatch, type FSWatcher } from 'node:fs';
+import { watch as fsWatch, statSync, type FSWatcher } from 'node:fs';
 
 export type WatchRunResult = {
   /** absolute paths of the files the last run read, so edits to any of them trigger another run */
@@ -11,6 +11,16 @@ export type WatchRunResult = {
    */
   ok: boolean,
 };
+
+/** a FIFO, socket or device (a directory is fine: a directory source can appear or disappear) */
+function isNonRegularFile(filePath: string) {
+  try {
+    const stat = statSync(filePath, { throwIfNoEntry: false });
+    return !!stat && !stat.isFile() && !stat.isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 export type FileWatchRunner = {
   /** stop watching. Safe to call more than once; a run already in flight finishes */
@@ -26,8 +36,10 @@ export type FileWatchRunner = {
  * Directories are watched rather than files, because editors save by renaming a temp file into
  * place, which silently ends a watch on the file itself. A directory event counts when it names
  * a known file, or any `.env*` file (so a newly created `.env.schema` or `.env.local` is picked
- * up in a directory source). `entryDirs` are watched from the start, including before the first
- * run has reported any files.
+ * up in a directory source). `entryDirs` are watched from the start, and `entryFiles` count as
+ * known from the start, so edits made before the first run reports anything (or after a first run
+ * that failed) are not missed. Anything that exists but is not a regular file, such as a FIFO a
+ * secret manager serves a value through, never triggers a run: reading it can itself change it.
  *
  * `run` should handle its own errors and report them through `ok: false`. If it throws anyway, the
  * error goes to `onError` and the watcher keeps going.
@@ -35,12 +47,14 @@ export type FileWatchRunner = {
 export function watchFiles(opts: {
   run: () => Promise<WatchRunResult>,
   entryDirs: Array<string>,
+  entryFiles?: Array<string>,
   debounceMs?: number,
   onError?: (err: unknown) => void,
 }): FileWatchRunner {
   const debounceMs = opts.debounceMs ?? 150;
   let stopped = false;
-  let knownFiles = new Set<string>();
+  const entryFiles = (opts.entryFiles ?? []).map((f) => path.resolve(f));
+  let knownFiles = new Set<string>(entryFiles);
   const watchers = new Map<string, FSWatcher>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
@@ -59,6 +73,7 @@ export function watchFiles(opts: {
       const watcher = fsWatch(dir, { persistent: true }, (_event, name) => {
         // some platforms omit the filename: treat that as "something changed"
         if (name && !knownFiles.has(path.join(dir, name)) && !name.startsWith('.env')) return;
+        if (name && isNonRegularFile(path.join(dir, name))) return;
         hooks.onChange?.();
       });
       // a watched directory that gets deleted emits an error: drop it, and the next run re-adds it
@@ -89,7 +104,8 @@ export function watchFiles(opts: {
         try {
           const result = await opts.run();
           const files = result.files.map((f) => path.resolve(f));
-          knownFiles = result.ok ? new Set(files) : new Set([...knownFiles, ...files]);
+          const reported = result.ok ? files : [...knownFiles, ...files];
+          knownFiles = new Set([...entryFiles, ...reported]);
         } catch (err) {
           opts.onError?.(err);
         }

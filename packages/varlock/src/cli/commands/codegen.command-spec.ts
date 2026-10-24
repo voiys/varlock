@@ -12,7 +12,7 @@ export const commandSpec = define({
     },
     shape: {
       type: 'boolean',
-      description: 'Load the schema without running exec(), secret providers, root decorators, plugin downloads or network requests, and ignore process.env',
+      description: 'Load the schema in shape mode: skip exec() and other resolvers with side effects, root decorator commands, secret providers, plugin downloads and network requests',
     },
     watch: {
       type: 'boolean',
@@ -36,9 +36,12 @@ disable automatic generation during \`varlock load\` or \`varlock run\`.
 
 By default the schema is loaded like \`varlock load\` does, so shell commands in
 root decorators (for example @cache=exec(...) or @setValuesBulk(exec(...))) run.
-Pass --shape to load it without running anything, which also makes the output
-independent of the env vars set in your shell. --watch implies --shape and keeps
-the last good output while the schema has errors.
+--shape loads it in shape mode instead: exec() and other resolvers with side
+effects, root decorator commands, secret providers, plugin downloads and network
+requests (such as custom icon downloads) are skipped, and env vars set in your shell
+no longer override item values. Plugins that are already installed are still
+loaded and their code runs. --watch implies --shape, and while the schema has
+errors it leaves the generated files as they were.
 
 Examples:
   varlock codegen                    # Generate using the default schema
