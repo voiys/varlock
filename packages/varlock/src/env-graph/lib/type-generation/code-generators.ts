@@ -108,9 +108,10 @@ async function generateTsFile(ctx: CodeGenContext): Promise<string> {
   // process.env augmentation drops its optionality (graph-level flag, not a decorator arg)
   options.injectUndefinedAsEmpty = ctx.graph.injectUndefinedAsEmpty;
   options.pluginIcons = ctx.graph.bundledIcons;
-  // a shape-mode graph only touches the network when downloads were allowed (codegen); otherwise custom icons
+  // a shape-mode graph only touches the network for a command the user ran (codegen); otherwise custom icons
   // that are not bundled or cached are left out
   options.fetchIcons = ctx.graph.mode !== 'shape' || ctx.graph.userCommand;
+  options.envFlagKey = ctx.graph.rootDataSource?.envFlagKey;
 
   return generateTsTypesSrc(ctx.fields, options);
 }
@@ -118,7 +119,7 @@ async function generateTsFile(ctx: CodeGenContext): Promise<string> {
 export const builtInCodeGenerators: Array<CodeGeneratorDef> = [
   {
     decoratorName: 'generateTsTypes',
-    knownOptions: ['exposeEnv', 'processEnv', 'importMetaEnv', 'icons'],
+    knownOptions: ['exposeEnv', 'processEnv', 'importMetaEnv', 'icons', 'narrowByEnv'],
     generate: generateTsFile,
   },
   { decoratorName: 'generatePythonEnv', knownOptions: [], generate: (ctx) => generatePythonEnvSrc(ctx.fields) },

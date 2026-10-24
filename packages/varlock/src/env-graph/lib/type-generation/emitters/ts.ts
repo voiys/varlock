@@ -203,6 +203,14 @@ export type TsGenOptions = {
    * left out of the JSDoc.
    */
   fetchIcons?: boolean;
+  /**
+   * Type `ENV` as a union with one member per group of environments, discriminated by the
+   * @currentEnv item, so checking it narrows which items are required (defaults to false).
+   * Only requiredness that is known statically (`forEnv()` with static args) is narrowed.
+   */
+  narrowByEnv?: boolean;
+  /** key of the @currentEnv item (set from the graph, not a decorator arg) */
+  envFlagKey?: string;
 };
 
 // defaults preserve the historical output: globally augment `varlock/env`, and augment both globals
@@ -219,6 +227,8 @@ const DEFAULT_TS_GEN_OPTIONS = {
   icons: true,
   pluginIcons: {},
   fetchIcons: true,
+  narrowByEnv: false,
+  envFlagKey: '',
 } satisfies Required<TsGenOptions>;
 
 const TS_ENV_EXPOSURE_VALUES: ReadonlyArray<TsEnvExposure> = ['global', 'local', 'none'];
@@ -255,7 +265,60 @@ function resolveTsGenOptions(options: Record<string, any> = {}): Required<TsGenO
     icons: coerceBooleanOption(options.icons, DEFAULT_TS_GEN_OPTIONS.icons, 'icons'),
     pluginIcons: options.pluginIcons ?? DEFAULT_TS_GEN_OPTIONS.pluginIcons,
     fetchIcons: options.fetchIcons ?? DEFAULT_TS_GEN_OPTIONS.fetchIcons,
+    narrowByEnv: coerceBooleanOption(options.narrowByEnv, DEFAULT_TS_GEN_OPTIONS.narrowByEnv, 'narrowByEnv'),
+    envFlagKey: options.envFlagKey || '',
   };
+}
+
+/**
+ * Build the members of the env-narrowed union: environments whose set of required items is the
+ * same share one member, so the union stays as small as the schema allows. Each member is the base
+ * schema intersected with the env literal(s) and the items that become required there. Intersections
+ * (rather than `Omit<...> & {...}`) keep every property linked to its declaration in the base
+ * schema, so go-to-definition and rename still work from `ENV.X`.
+ */
+function getEnvNarrowedMembers(
+  fields: Array<ResolvedFieldType>,
+  envFlagKey: string,
+  baseType: string,
+  schemaType: string,
+): Array<string> {
+  const errPrefix = '@generateTsTypes - `narrowByEnv`';
+  if (!envFlagKey) throw new Error(`${errPrefix} needs @currentEnv to be set`);
+  const envField = fields.find((f) => f.key === envFlagKey);
+  if (!envField) {
+    throw new Error(`${errPrefix} needs the @currentEnv item \`${envFlagKey}\` in the generated types (is it excluded by \`filter\`?)`);
+  }
+  const envType = envField.coerced;
+  if (typeof envType !== 'object' || !('enum' in envType) || !envType.enum.length) {
+    throw new Error(`${errPrefix} needs the @currentEnv item \`${envFlagKey}\` to be an enum, e.g. \`@type=enum(development, production)\``);
+  }
+
+  const groups = new Map<string, { envs: Array<string | number | boolean>, requiredKeys: Array<string> }>();
+  for (const env of envType.enum) {
+    const requiredKeys = fields.filter((f) => {
+      const byEnv = f.requiredByEnv;
+      if (!byEnv || byEnv.envFlagKey !== envFlagKey) return false;
+      return byEnv.matchEnvs.includes(String(env)) === byEnv.requiredWhenMatched;
+    }).map((f) => f.key);
+    const groupId = requiredKeys.join(',');
+    const group = groups.get(groupId);
+    if (group) group.envs.push(env);
+    else groups.set(groupId, { envs: [env], requiredKeys });
+  }
+
+  const members = [...groups.values()].map(({ envs, requiredKeys }) => {
+    const props = [
+      `readonly ${tsPropertyKey(envFlagKey)}: ${envs.map((e) => JSON.stringify(e)).join(' | ')}`,
+      ...requiredKeys.map((key) => `readonly ${tsPropertyKey(key)}: NonNullable<${schemaType}[${JSON.stringify(key)}]>`),
+    ];
+    return `(${baseType} & { ${props.join('; ')} })`;
+  });
+  // an optional env flag can be unset at runtime, so keep a member for that (nothing narrowed)
+  if (!envField.isRequired) {
+    members.push(`(${baseType} & { readonly ${tsPropertyKey(envFlagKey)}?: undefined })`);
+  }
+  return members;
 }
 
 // `loose` explicitly allows arbitrary extra keys via an index signature; `strict` lists only the
@@ -297,6 +360,21 @@ export async function generateTsTypesSrc(fields: Array<ResolvedFieldType>, optio
 
   tsSrc.push(`type ${schemaAlias} = CoercedEnvSchema;`);
 
+  // `narrowByEnv`: the schema split by the current environment, so checks narrow requiredness
+  const narrowedAlias = `_CoercedEnvSchemaByEnv_${schemaHash}`;
+  if (opts.narrowByEnv) {
+    const members = getEnvNarrowedMembers(fields, opts.envFlagKey, 'Readonly<CoercedEnvSchema>', 'CoercedEnvSchema');
+    tsSrc.push(
+      '',
+      `// \`CoercedEnvSchema\` split by the current environment (\`${opts.envFlagKey}\`), so that checking`,
+      '// it narrows which items are required (`narrowByEnv`)',
+      'export type CoercedEnvSchemaByEnv =',
+      ...members.map((m) => `  | ${m}`),
+      ';',
+      `type ${narrowedAlias} = CoercedEnvSchemaByEnv;`,
+    );
+  }
+
   const exposedNonSensitiveKeys: Array<string> = [];
   for (const field of fields) {
     if (!field.isSensitive) exposedNonSensitiveKeys.push(field.key);
@@ -314,7 +392,8 @@ export async function generateTsTypesSrc(fields: Array<ResolvedFieldType>, optio
     tsSrc.push(`
 declare module 'varlock/env' {
   export interface TypedEnvSchema extends Readonly<${schemaAlias}> {}
-  export interface PublicTypedEnvSchema extends Readonly<${pickPublic(schemaAlias)}> {}
+  export interface PublicTypedEnvSchema extends Readonly<${pickPublic(schemaAlias)}> {}${opts.narrowByEnv ? `
+  export interface TypedEnvByEnv { env: ${narrowedAlias} }` : ''}
 }
 `);
   }
@@ -361,7 +440,7 @@ export type ProcessEnvSchemaAsStrings = {
 export type PublicCoercedEnvSchema = Readonly<${pickPublic('CoercedEnvSchema')}>;
 
 // re-export of the runtime ENV proxy, typed to this package's schema
-export const ENV = _ENV as unknown as Readonly<CoercedEnvSchema>;
+export const ENV = _ENV as unknown as ${opts.narrowByEnv ? 'CoercedEnvSchemaByEnv' : 'Readonly<CoercedEnvSchema>'};
 `);
   }
 

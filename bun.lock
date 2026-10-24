@@ -549,6 +549,7 @@
         "outdent": "catalog:",
         "reflect-metadata": "^0.2.2",
         "tsdown": "catalog:",
+        "typescript": "catalog:",
         "verkit": "^0.4.0",
         "vitest": "catalog:",
       },

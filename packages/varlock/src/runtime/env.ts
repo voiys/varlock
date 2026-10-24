@@ -875,6 +875,13 @@ const IGNORED_PROXY_KEYS = [
 // unless type generation is enabled
 export interface TypedEnvSchema {}
 export interface PublicTypedEnvSchema {}
+/**
+ * With `@generateTsTypes(narrowByEnv=true)`, type generation adds an `env` property here holding the
+ * schema split by the current environment, and `ENV` is typed with it. It is still intersected with
+ * `TypedEnvSchema` so keys merged in from other generated files stay available.
+ */
+export interface TypedEnvByEnv {}
+type TypedEnv = TypedEnvByEnv extends { env: infer T } ? T & TypedEnvSchema : TypedEnvSchema;
 type DynamicConfigAccessMeta = {
   key: string,
   isPublic: boolean,
@@ -1137,7 +1144,7 @@ const EnvProxy = new Proxy<TypedEnvSchema>({}, {
   },
 });
 
-export const ENV = EnvProxy;
+export const ENV = EnvProxy as unknown as TypedEnv;
 
 // we will attempt to call initVarlockEnv automatically, but in most cases it should be called explicitly
 // note that if this is being imported in the browser, process.env may not exist, so we do this in a try/catch.

@@ -16,6 +16,8 @@ export type ResolvedFieldType = {
   key: string;
   coerced: CoercedType;
   isRequired: boolean;
+  /** set when requiredness depends only on the current environment (see `TypeGenItemInfo`) */
+  requiredByEnv?: TypeGenItemInfo['requiredByEnv'];
   isSensitive: boolean;
   docs: FieldDocs;
 };
@@ -28,6 +30,7 @@ export function resolveFieldType(info: TypeGenItemInfo): ResolvedFieldType {
     key: info.key,
     coerced,
     isRequired: info.isRequired && !info.isRequiredDynamic,
+    ...info.requiredByEnv && { requiredByEnv: info.requiredByEnv },
     isSensitive: info.isSensitive,
     docs: {
       description: info.description,

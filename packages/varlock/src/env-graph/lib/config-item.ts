@@ -19,7 +19,7 @@ import type { CacheHitInfo } from './resolution-context';
 import { EnvGraphDataSource } from './data-source';
 import {
   convertParsedValueToResolvers, getMalformedFunctionCallError, type ResolvedValue, Resolver, StaticValueResolver,
-  ArrayLiteralResolver, ObjectLiteralResolver,
+  ArrayLiteralResolver, ObjectLiteralResolver, ForEnvResolver,
 } from './resolver';
 import { buildTypeSpecPlan, coercedTypesMatch, type TypeSpecPlan } from './type-decorator';
 import { ItemDecoratorInstance } from './decorators';
@@ -1324,6 +1324,30 @@ export class ConfigItem {
   }
 
   /**
+   * `@required=forEnv(a, b)` / `@optional=forEnv(a, b)` with only static args depends on nothing
+   * but the current environment, so type generation can tell exactly which environments make the
+   * item required. Anything else (refs, other functions) stays plain dynamic.
+   */
+  private getStaticForEnvRequiredness(
+    resolver: Resolver | undefined,
+    usingOptional: boolean,
+  ): TypeGenItemInfo['requiredByEnv'] {
+    if (!(resolver instanceof ForEnvResolver)) return;
+    // forEnv() reads the env flag of the source that declared it, which can differ from the root's
+    // (an imported schema with its own @currentEnv), and only the root's flag is in generated types
+    const envFlagKey = this.envGraph.rootDataSource?.envFlagKey;
+    if (!envFlagKey || resolver.dataSource?.envFlagKey !== envFlagKey) return;
+    const args = resolver.arrArgs ?? [];
+    if (!args.length) return;
+    const matchEnvs: Array<string> = [];
+    for (const arg of args) {
+      if (!(arg instanceof StaticValueResolver) || arg.staticValue === undefined) return;
+      matchEnvs.push(String(arg.staticValue));
+    }
+    return { envFlagKey, matchEnvs, requiredWhenMatched: !usingOptional };
+  }
+
+  /**
    * Compute schema-level info for type generation using only non-env-specific definitions.
    * This mirrors the logic of processRequired/processSensitive but:
    * - Uses defsForTypeGeneration (excludes env-specific sources)
@@ -1345,6 +1369,7 @@ export class ConfigItem {
     // isRequired / isRequiredDynamic - mirrors processRequired() logic
     let isRequired = true;
     let isRequiredDynamic = false;
+    let requiredByEnv: TypeGenItemInfo['requiredByEnv'];
     try {
       for (const def of defs) {
         const requiredDecs = def.itemDef.decorators?.filter((d) => d.name === 'required' || d.name === 'optional') || [];
@@ -1354,6 +1379,7 @@ export class ConfigItem {
           const usingOptional = requiredDec.name === 'optional';
           if (requiredDec.decValueResolver?.fnName !== '\0static') {
             isRequiredDynamic = true;
+            requiredByEnv = this.getStaticForEnvRequiredness(requiredDec.decValueResolver, usingOptional);
             // Dynamic decorators depend on runtime values not yet resolved here.
             // Skip resolve() to avoid caching a stale result that would corrupt
             // the later processRequired() call during resolveEnvValues().
@@ -1552,6 +1578,7 @@ export class ConfigItem {
       dataType: this.dataType,
       isRequired,
       isRequiredDynamic,
+      requiredByEnv,
       isSensitive,
       isDynamic,
       icon,
@@ -1570,6 +1597,17 @@ export type TypeGenItemInfo = {
   dataType?: EnvGraphDataType;
   isRequired: boolean;
   isRequiredDynamic: boolean;
+  /**
+   * Set when requiredness depends only on the current environment (`forEnv()` with static args):
+   * the item is required when the env is one of `matchEnvs` if `requiredWhenMatched`, and
+   * required in every other env otherwise
+   */
+  requiredByEnv?: {
+    /** key of the @currentEnv item the envs refer to */
+    envFlagKey: string;
+    matchEnvs: Array<string>;
+    requiredWhenMatched: boolean;
+  };
   isSensitive: boolean;
   isDynamic: boolean;
   icon?: string;
