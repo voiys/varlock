@@ -56,6 +56,10 @@ export default tseslint.config(
       'packages/env-spec-parser/src/grammar.js',
       'packages/varlock-website/.astro',
       'packages/varlock/src/env-graph/test/plugins',
+      // written by scripts/realworld-fixtures.ts and the real-world schema test; reformatting them
+      // would make every regenerated file a diff
+      'packages/varlock/test/realworld-schemas/manifest.json',
+      'packages/varlock/test/realworld-schemas/snapshots',
       '**/*.ignore',
       '**/.vercel',
       '**/.netlify',

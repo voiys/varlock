@@ -1,7 +1,9 @@
 dist
 dist-sea
 native-bins
-skills
+# generated copy of the repo-root skills/ (scripts/sync-skill.ts); anchored so it does not hide
+# other folders named skills, such as ones inside test/realworld-schemas/fixtures
+/skills
 
 # Generated during the release job (native binary checksums, uploaded as a
 # workflow artifact, not part of the npm package). Ignored so it does not

@@ -1,0 +1,1259 @@
+{
+  "fixtures": [
+    {
+      "id": "0xZ0uk__PorkBot__apps__backup__.env.schema",
+      "repo": "0xZ0uk/PorkBot",
+      "commit": "1176dd2020b5b1ce7f06364e08090c86acb68c07",
+      "path": "apps/backup/.env.schema",
+      "url": "https://github.com/0xZ0uk/PorkBot/blob/1176dd2020b5b1ce7f06364e08090c86acb68c07/apps/backup/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.ci": "e27a5f4d37b53bf8a2213417e8842df42f907f032ffd05a8e7afda54731052b3",
+        ".env.schema": "196a71357e1eeb96f5bbca7d73ba110e563715fb01a91168934110cb3e3feccf",
+        "apps/backup/.env.schema": "84d15a729663088651a903166c0e8ab01c5a6fd5b09099f50da2a02168ccb19d"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "0xZ0uk__PorkBot__apps__supervisor__.env.schema",
+      "repo": "0xZ0uk/PorkBot",
+      "commit": "1176dd2020b5b1ce7f06364e08090c86acb68c07",
+      "path": "apps/supervisor/.env.schema",
+      "url": "https://github.com/0xZ0uk/PorkBot/blob/1176dd2020b5b1ce7f06364e08090c86acb68c07/apps/supervisor/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.ci": "e27a5f4d37b53bf8a2213417e8842df42f907f032ffd05a8e7afda54731052b3",
+        ".env.schema": "196a71357e1eeb96f5bbca7d73ba110e563715fb01a91168934110cb3e3feccf",
+        "apps/supervisor/.env.schema": "8ebb1d92b582b24749f351aee2a08be9e528e94e683ab0fbe40496c7a2b2be1d"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "acheddir__angular-monorepo-starter__apps__app__.env.schema",
+      "repo": "acheddir/angular-monorepo-starter",
+      "commit": "336b1ce1d1d961dcb4fa94522d32f946fd51b5dc",
+      "path": "apps/app/.env.schema",
+      "url": "https://github.com/acheddir/angular-monorepo-starter/blob/336b1ce1d1d961dcb4fa94522d32f946fd51b5dc/apps/app/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/app/.env.schema": "ae945bd90ed0c00399c0c323ca91b59c6c23543bf74b3ef09b4e459cf0b69aa1"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "aitorllj93__astro-loader-obsidian__packages__astro-spaceship__shell__utils__.env.schema",
+      "repo": "aitorllj93/astro-loader-obsidian",
+      "commit": "9f72c9d65539c6a1add35ab00a5d7d31bd954ae2",
+      "path": "packages/astro-spaceship/shell/utils/.env.schema",
+      "url": "https://github.com/aitorllj93/astro-loader-obsidian/blob/9f72c9d65539c6a1add35ab00a5d7d31bd954ae2/packages/astro-spaceship/shell/utils/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/astro-spaceship/shell/utils/.env.schema": "dc6ada7ba8004c7baa6e59b845641eeb72738046d43f0c157c72abbc44c8f92c"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "aitorllj93__astro-loader-obsidian__packages__obsidian-hal-9000__api__.env.schema",
+      "repo": "aitorllj93/astro-loader-obsidian",
+      "commit": "9f72c9d65539c6a1add35ab00a5d7d31bd954ae2",
+      "path": "packages/obsidian-hal-9000/api/.env.schema",
+      "url": "https://github.com/aitorllj93/astro-loader-obsidian/blob/9f72c9d65539c6a1add35ab00a5d7d31bd954ae2/packages/obsidian-hal-9000/api/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/obsidian-hal-9000/api/.env.schema": "4021b33da93ab0535b7fe883ff2536d0cb0aa2eaefe9ff5aa605f256adad1323"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "akhila-ariyachandra__akhilaariyachandra.com__.env.schema",
+      "repo": "akhila-ariyachandra/akhilaariyachandra.com",
+      "commit": "3bd0c7658f7078d1901e30b0070f0aa17d6d2409",
+      "path": ".env.schema",
+      "url": "https://github.com/akhila-ariyachandra/akhilaariyachandra.com/blob/3bd0c7658f7078d1901e30b0070f0aa17d6d2409/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "36d5aa2a13a9cf83942183a0436e84dceb4b664a0159eaf22b864a3ed39edbcb"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "akshad-exe__rave__apps__server__.env.schema",
+      "repo": "akshad-exe/rave",
+      "commit": "94fa76ad15a574da38bc7b1f3ba4428cd3d3dbc2",
+      "path": "apps/server/.env.schema",
+      "url": "https://github.com/akshad-exe/rave/blob/94fa76ad15a574da38bc7b1f3ba4428cd3d3dbc2/apps/server/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/server/.env.schema": "590a75854f43d0443155c1160cecf70d7d3b110a8811240fd623a8bf472320ea"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "asabaylus__teamhero.cli__.env.schema",
+      "repo": "asabaylus/teamhero.cli",
+      "commit": "3e45ba7335887e9ce06d0bc8ae1eaf443baf829a",
+      "path": ".env.schema",
+      "url": "https://github.com/asabaylus/teamhero.cli/blob/3e45ba7335887e9ce06d0bc8ae1eaf443baf829a/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "a0ce5312166ee1889c2f37e503d0e1bf012e9d183860dc955ab4f68ec4489982"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "expectErrors": "Schema defect: `@defaultSensitive=false` is a root decorator but is attached to config items (line 124 and on).",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "aspitrine__projection__apps__web__.env.schema",
+      "repo": "aspitrine/projection",
+      "commit": "38e3110ad2a35f25c631a639a254f466afc40001",
+      "path": "apps/web/.env.schema",
+      "url": "https://github.com/aspitrine/projection/blob/38e3110ad2a35f25c631a639a254f466afc40001/apps/web/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/web/.env.schema": "cd311974794b298eefb4629925981b558ee227c13571b5bfb5079047bc33f0df"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "bjesuiter__hushref__packages__global-tests__.env.schema",
+      "repo": "bjesuiter/hushref",
+      "commit": "34fe761827c3b4fc9f5413df4ef4682188fc38e9",
+      "path": "packages/global-tests/.env.schema",
+      "url": "https://github.com/bjesuiter/hushref/blob/34fe761827c3b4fc9f5413df4ef4682188fc38e9/packages/global-tests/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/global-tests/.env.schema": "6734a498926456dd681ce22f01c1a2f0da46c1f30d6edd5f14df3971d4c59279"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "BleedingDev__dx-feature-tracker__.env.schema",
+      "repo": "BleedingDev/dx-feature-tracker",
+      "commit": "c9c91fc159f77cab19869e24afc590923c73c166",
+      "path": ".env.schema",
+      "url": "https://github.com/BleedingDev/dx-feature-tracker/blob/c9c91fc159f77cab19869e24afc590923c73c166/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "1940a7613e43c63072492433378fe97987495a5b6204435528fa3dd722305f21"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "BradNut__AdelieStack__apps__web__.env.schema",
+      "repo": "BradNut/AdelieStack",
+      "commit": "c140a1aa7b98f46bcaf427e88892b14a2a86ec9f",
+      "path": "apps/web/.env.schema",
+      "url": "https://github.com/BradNut/AdelieStack/blob/c140a1aa7b98f46bcaf427e88892b14a2a86ec9f/apps/web/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/web/.env.schema": "6398a5666bfaf64a2793e228e6b9ebde994121504d165ed23154f72477e83122"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "commercelayer__commercelayer-sdk__packages__core-sdk__.env.schema",
+      "repo": "commercelayer/commercelayer-sdk",
+      "commit": "a0741530712d3368c76073c77421d37ec4cb1356",
+      "path": "packages/core-sdk/.env.schema",
+      "url": "https://github.com/commercelayer/commercelayer-sdk/blob/a0741530712d3368c76073c77421d37ec4cb1356/packages/core-sdk/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/core-sdk/.env.schema": "cf39bba6ddaedcf8c7b69c29f49ffddbddbf80ee79abe1efee80725be7514f4d"
+      },
+      "plugins": [
+        "@varlock/aws-secrets-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/aws-secrets-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "commercelayer__commercelayer-sdk__packages__provisioning-sdk__.env.schema",
+      "repo": "commercelayer/commercelayer-sdk",
+      "commit": "a0741530712d3368c76073c77421d37ec4cb1356",
+      "path": "packages/provisioning-sdk/.env.schema",
+      "url": "https://github.com/commercelayer/commercelayer-sdk/blob/a0741530712d3368c76073c77421d37ec4cb1356/packages/provisioning-sdk/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/provisioning-sdk/.env.schema": "8b7e939a50446fa78a321378787815cccc88207b5a07c893217ffdb83ec46189"
+      },
+      "plugins": [
+        "@varlock/aws-secrets-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/aws-secrets-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "commercelayer__mfe-cart__packages__cart__.env.schema",
+      "repo": "commercelayer/mfe-cart",
+      "commit": "b6401146b47c65d3cf2138659a3289141eef0c4b",
+      "path": "packages/cart/.env.schema",
+      "url": "https://github.com/commercelayer/mfe-cart/blob/b6401146b47c65d3cf2138659a3289141eef0c4b/packages/cart/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/cart/.env.schema": "def6a966173c2ed9dcd0ba36b0ebc2d97edc81bbc0fb501ceab444c78b0552a7"
+      },
+      "plugins": [
+        "@varlock/aws-secrets-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/aws-secrets-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "commercelayer__mfe-microstore__packages__microstore__.env.schema",
+      "repo": "commercelayer/mfe-microstore",
+      "commit": "bdedf8c1623a153d1db9680e5b95037ab4dbbaf2",
+      "path": "packages/microstore/.env.schema",
+      "url": "https://github.com/commercelayer/mfe-microstore/blob/bdedf8c1623a153d1db9680e5b95037ab4dbbaf2/packages/microstore/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/microstore/.env.schema": "a29ffb70259ff97ce30e3d1ba6c30124de4234f4d936dd01981da20f0fcb0eb1"
+      },
+      "plugins": [
+        "@varlock/aws-secrets-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/aws-secrets-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "cschmatzler__alibi__.env.schema",
+      "repo": "cschmatzler/alibi",
+      "commit": "b8664ebc68fca9de8900f3b3a379ab647acfa980",
+      "path": ".env.schema",
+      "url": "https://github.com/cschmatzler/alibi/blob/b8664ebc68fca9de8900f3b3a379ab647acfa980/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "bbc24578d40b7e574547c4f7c7d7f88f0517b420e546bc239103192442b4edd6"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "expectErrors": "APP_ENV is `@required` with no value and drives `@currentEnv`; the author sets it at deploy time.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "cubanx__command-deck__.env.schema",
+      "repo": "cubanx/command-deck",
+      "commit": "0eb7d167a9eda75e9024621da515784f68e52d8f",
+      "path": ".env.schema",
+      "url": "https://github.com/cubanx/command-deck/blob/0eb7d167a9eda75e9024621da515784f68e52d8f/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "d4354a374f79b36c6fca5da26064a326e2dae4768aac26c830648292571aefd3"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "dakdevs__nextjs-start__.env.schema",
+      "repo": "dakdevs/nextjs-start",
+      "commit": "28af4344a65c63900dae17dec46edb3073f1e99b",
+      "path": ".env.schema",
+      "url": "https://github.com/dakdevs/nextjs-start/blob/28af4344a65c63900dae17dec46edb3073f1e99b/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "5167fa55167f2116b9575e3db1cd0984a0298893b0dda0c68e14402bf76d34a7"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DaveDushi__kolshek__.env.schema",
+      "repo": "DaveDushi/kolshek",
+      "commit": "9b447d2574bada376f9b41e1fad9bbbe26c49307",
+      "path": ".env.schema",
+      "url": "https://github.com/DaveDushi/kolshek/blob/9b447d2574bada376f9b41e1fad9bbbe26c49307/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "a0c3d22f2760c6b115d5f04b81832d619423ffb179c4e627ec5480021d62aa21"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DCC-BS__bentoml-faster-whisper__.env.schema",
+      "repo": "DCC-BS/bentoml-faster-whisper",
+      "commit": "d01224f83963152cbd348be146f18f5ca6e508cc",
+      "path": ".env.schema",
+      "url": "https://github.com/DCC-BS/bentoml-faster-whisper/blob/d01224f83963152cbd348be146f18f5ca6e508cc/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "809784989a9fb34fe919fabf9f0cd510b9bf76c5ab4127d9cf806b5677194aea"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "expectErrors": "Schema defect: `@description` is not a varlock decorator (line 4 and on), so every item that uses it reports \"Unknown decorator\".",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DCC-BS__bs-translator-backend__.env.schema",
+      "repo": "DCC-BS/bs-translator-backend",
+      "commit": "74beed88542c2c4183c0be7fe2e156f81d11270d",
+      "path": ".env.schema",
+      "url": "https://github.com/DCC-BS/bs-translator-backend/blob/74beed88542c2c4183c0be7fe2e156f81d11270d/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.dev.schema": "d432f588ab254f7222b73d3ddbc0dee9a0232707506ba09649ec3d0c503393b2",
+        ".env.schema": "c6ae50ca88e15f23675a2897282ebc6e3668c7aa08b18e8b92b2f3f82dab681d"
+      },
+      "plugins": [
+        "@varlock/proton-pass-plugin@0.0.3"
+      ],
+      "unresolved": [],
+      "expectErrors": "The schema pins @varlock/proton-pass-plugin@0.0.3, which is not installed or cached here and is never downloaded in shape mode, so loading stops at that @plugin. Tests never install plugins.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DCC-BS__bs-translator-frontend__docker__.env.schema",
+      "repo": "DCC-BS/bs-translator-frontend",
+      "commit": "1e89b567bededaaeb2dcad22ecfd9d2788d19f9a",
+      "path": "docker/.env.schema",
+      "url": "https://github.com/DCC-BS/bs-translator-frontend/blob/1e89b567bededaaeb2dcad22ecfd9d2788d19f9a/docker/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.buildtime.schema": "e1ac116883d633b8813eae12d0364869f6ad6d8409443ae1c2cb72eb7569bc67",
+        "docker/.env.schema": "99b0f1b44f9d4553eaaef59a9d6184a5bf83f98392a4442ad84c6c755188e9ac"
+      },
+      "plugins": [
+        "@varlock/proton-pass-plugin@0.0.3"
+      ],
+      "unresolved": [],
+      "expectErrors": "The schema pins @varlock/proton-pass-plugin@0.0.3, which is not installed or cached here and is never downloaded in shape mode, so loading stops at that @plugin. Tests never install plugins.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DCC-BS__text-mate-backend__.env.schema",
+      "repo": "DCC-BS/text-mate-backend",
+      "commit": "b5cfc9bb7558da427d4522892147389eb50a78ca",
+      "path": ".env.schema",
+      "url": "https://github.com/DCC-BS/text-mate-backend/blob/b5cfc9bb7558da427d4522892147389eb50a78ca/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.azure.schema": "33ae81eb8916ad62f8c7911fc79e28f03f1e42d37da51dd1344477848ce4440e",
+        ".env.dev.schema": "8c6306c5db35cbb56ed81c7889cecd3a459079feb11860e408982b9edf1a30f8",
+        ".env.schema": "fcc5389c39232d6db692299121e3de439d1b5cfeeb3c1a6ccc823d9b495b8dfb"
+      },
+      "plugins": [
+        "@varlock/proton-pass-plugin@0.0.3"
+      ],
+      "unresolved": [],
+      "expectErrors": "The schema pins @varlock/proton-pass-plugin@0.0.3, which is not installed or cached here and is never downloaded in shape mode, so loading stops at that @plugin. Tests never install plugins.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DCC-BS__text-mate-frontend__docker__.env.schema",
+      "repo": "DCC-BS/text-mate-frontend",
+      "commit": "b396b3632c349c1c854916b5dfd3c0520e06686c",
+      "path": "docker/.env.schema",
+      "url": "https://github.com/DCC-BS/text-mate-frontend/blob/b396b3632c349c1c854916b5dfd3c0520e06686c/docker/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.buildtime.schema": "8c1c111c77af88f788f4a83dab6d2afbf0881c599c71f44713cb6ef2295dd035",
+        "docker/.env.azure.schema": "a8ff891a7700723a5699dc957688e392324ad236a5dcae28c3bb0419a270da12",
+        "docker/.env.schema": "2c3593efe728e3597c4dc7f9a5b0d5e840fddaf007de7349d0650a7b4389f887"
+      },
+      "plugins": [
+        "@varlock/proton-pass-plugin@0.0.3"
+      ],
+      "unresolved": [
+        "env.azure.schema"
+      ],
+      "expectErrors": "The schema pins @varlock/proton-pass-plugin@0.0.3, which is not installed or cached here and is never downloaded in shape mode, so loading stops at that @plugin. Tests never install plugins.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "discordkit__discordkit__examples__with-waku__.env.schema",
+      "repo": "discordkit/discordkit",
+      "commit": "39b426ba3c1902a331a90c0013e5556f3e65b8a8",
+      "path": "examples/with-waku/.env.schema",
+      "url": "https://github.com/discordkit/discordkit/blob/39b426ba3c1902a331a90c0013e5556f3e65b8a8/examples/with-waku/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE.md"
+      },
+      "files": {
+        "examples/with-waku/.env.schema": "0f3f82a38095bb5c7f7030b3e143a1a4bd59b23d6aa7aa5d25d7556f406f36e5"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "dkarter__foreman__.env.schema",
+      "repo": "dkarter/foreman",
+      "commit": "14908b40e8949eab1e7c5bfa420aae2c9035f318",
+      "path": ".env.schema",
+      "url": "https://github.com/dkarter/foreman/blob/14908b40e8949eab1e7c5bfa420aae2c9035f318/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "8fdba54543b0d4dcc85c88fec7a183c64363c96a03e02ae10c1e9df6e9c1c500"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DMR-is__dmr.is__.env.schema",
+      "repo": "DMR-is/dmr.is",
+      "commit": "08d6297cadd23cee3d707dc09777efe430052e92",
+      "path": ".env.schema",
+      "url": "https://github.com/DMR-is/dmr.is/blob/08d6297cadd23cee3d707dc09777efe430052e92/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "b6e9c1fbae4796c4923d8a89ee15118fdd716a65c47288c7ca6204d08aee3a83"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "DMR-is__dmr.is__apps__directorate-of-equality-api__.env.schema",
+      "repo": "DMR-is/dmr.is",
+      "commit": "08d6297cadd23cee3d707dc09777efe430052e92",
+      "path": "apps/directorate-of-equality-api/.env.schema",
+      "url": "https://github.com/DMR-is/dmr.is/blob/08d6297cadd23cee3d707dc09777efe430052e92/apps/directorate-of-equality-api/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "b6e9c1fbae4796c4923d8a89ee15118fdd716a65c47288c7ca6204d08aee3a83",
+        "apps/directorate-of-equality-api/.env.schema": "7f2d0fc2a07806d21c0ea3cac8dfa4d89cf7100ba9de696133d48bb52596e127"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "FreakeyPlays__eitri__.env.schema",
+      "repo": "FreakeyPlays/eitri",
+      "commit": "07d0a10832907235687c1c15e4e5700051f1067a",
+      "path": ".env.schema",
+      "url": "https://github.com/FreakeyPlays/eitri/blob/07d0a10832907235687c1c15e4e5700051f1067a/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "01c0fd64ea9bff74805c614ff938cdbb228af7e1bab542d7e1a380e0af2ef762"
+      },
+      "plugins": [
+        "@varlock/bitwarden-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/bitwarden-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "GEOLYTIX__xyz__varlock__gsm-adc.env.schema",
+      "repo": "GEOLYTIX/xyz",
+      "commit": "786e3157b7c6e01823e0a64768a9f49266672acc",
+      "path": "varlock/gsm-adc.env.schema",
+      "url": "https://github.com/GEOLYTIX/xyz/blob/786e3157b7c6e01823e0a64768a9f49266672acc/varlock/gsm-adc.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "varlock/gsm-adc.env.schema": "4e96cc81867261beac0b3c6c8ba4b0794251044498784f5ecae1a5c2bb8c9dc5"
+      },
+      "plugins": [
+        "@varlock/google-secret-manager-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "Schema defect: `@currentEnv=$APP_ENV` but APP_ENV is defined nowhere in the schema or its imports.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "GEOLYTIX__xyz__varlock__vanilla.env.schema",
+      "repo": "GEOLYTIX/xyz",
+      "commit": "786e3157b7c6e01823e0a64768a9f49266672acc",
+      "path": "varlock/vanilla.env.schema",
+      "url": "https://github.com/GEOLYTIX/xyz/blob/786e3157b7c6e01823e0a64768a9f49266672acc/varlock/vanilla.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "varlock/vanilla.env.schema": "f6eb3b563de79ab8228fe7ee5f7d99e523630b8156d59b35d5331e232e77de12"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "gergogyulai__picslop__apps__web__.env.schema",
+      "repo": "gergogyulai/picslop",
+      "commit": "2740f02d582ac3d19ceb2d1ac6b84c579c2bd432",
+      "path": "apps/web/.env.schema",
+      "url": "https://github.com/gergogyulai/picslop/blob/2740f02d582ac3d19ceb2d1ac6b84c579c2bd432/apps/web/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/web/.env.schema": "e876ddce96413a4c94cd8e476f0bdd4e70809c6825e5796dab5ac3a550751d87"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "getmendra__librarian__.env.schema",
+      "repo": "getmendra/librarian",
+      "commit": "4a3a49a5910c6436730084fcbab1e435496a0c80",
+      "path": ".env.schema",
+      "url": "https://github.com/getmendra/librarian/blob/4a3a49a5910c6436730084fcbab1e435496a0c80/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "1001aa6c8a4c0263b19a25200ae9193ec2b484c1494402b3cd427e1b027a0f63"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "hadronomy__canary__apps__web__.env.schema",
+      "repo": "hadronomy/canary",
+      "commit": "5a0a6ea50fc60f7b91257195d8a4c338b71b913c",
+      "path": "apps/web/.env.schema",
+      "url": "https://github.com/hadronomy/canary/blob/5a0a6ea50fc60f7b91257195d8a4c338b71b913c/apps/web/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "930ce8edacf5d6300b88a19d890cd6d042f193d31182ce5f670632bb5209edf5",
+        "apps/web/.env.schema": "dc8e0667276473caeba571a806fccf90c7f27c8f7a3208d21a3da9ffaefa1030"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "joelhooks__mischief__.env.schema",
+      "repo": "joelhooks/mischief",
+      "commit": "05e018fbdeff3df7b58e3a3c385e8ebdae0cf864",
+      "path": ".env.schema",
+      "url": "https://github.com/joelhooks/mischief/blob/05e018fbdeff3df7b58e3a3c385e8ebdae0cf864/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "1e5368a4602d08a2eed51375d78517aac42a543437225c9c4c33b90e81a720f9"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "joelhooks__potion-calendar__.env.schema",
+      "repo": "joelhooks/potion-calendar",
+      "commit": "19a3a6e5577ecdcdb497a6c1c861351cfdf548cb",
+      "path": ".env.schema",
+      "url": "https://github.com/joelhooks/potion-calendar/blob/19a3a6e5577ecdcdb497a6c1c861351cfdf548cb/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "81fa914e5f8f541b067c544ba194e665f96b0dfba9db5f9f0df6b5d8c588f28f"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "joelhooks__rat-stack__.env.schema",
+      "repo": "joelhooks/rat-stack",
+      "commit": "87dea7125b103f0962ca7922cccf71e81e044bec",
+      "path": ".env.schema",
+      "url": "https://github.com/joelhooks/rat-stack/blob/87dea7125b103f0962ca7922cccf71e81e044bec/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "160ac630861fc139bcdb5a6d9e679f1001012058ff9696b18cea3aa0ec45f965",
+        "apps/site/.env.schema": "aab82c58246e3fa49e0efd459806e23a0fda637aa2cabee32c8529c25b4f278b"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "joelhooks__uncomplect__.env.schema",
+      "repo": "joelhooks/uncomplect",
+      "commit": "0fe520c71a2a9fb5db1b2ffcf76d93abf27eba44",
+      "path": ".env.schema",
+      "url": "https://github.com/joelhooks/uncomplect/blob/0fe520c71a2a9fb5db1b2ffcf76d93abf27eba44/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "3e5e23bc3ee2913e95763401103d6e642757cd1f2838aa275a4efd10cbb45d46"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "kevinpeckham__stem-shovel__.env.schema",
+      "repo": "kevinpeckham/stem-shovel",
+      "commit": "8cff1db6f70db57cec6f62867b69d0cbbd767d7f",
+      "path": ".env.schema",
+      "url": "https://github.com/kevinpeckham/stem-shovel/blob/8cff1db6f70db57cec6f62867b69d0cbbd767d7f/.env.schema",
+      "license": {
+        "spdx": "Apache-2.0",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "684f5df15359aa3e805d1face006540c9e32320bcd9a4175be76e6e7893690de"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "khromov__mochi__packages__site__src__demos__varlock__.env.schema",
+      "repo": "khromov/mochi",
+      "commit": "91d550d3a5d626b02c73cdafdcec0f824422e63f",
+      "path": "packages/site/src/demos/varlock/.env.schema",
+      "url": "https://github.com/khromov/mochi/blob/91d550d3a5d626b02c73cdafdcec0f824422e63f/packages/site/src/demos/varlock/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "packages/site/src/demos/varlock/.env.schema": "0eafab591a788cd890c04148adac2817a03f33b7cab425d319f5eda8ce3aac0e"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "lattices-dev__lattices__.env.schema",
+      "repo": "lattices-dev/lattices",
+      "commit": "81eaf74c2a015bf4c2f2f1901938d969a146437e",
+      "path": ".env.schema",
+      "url": "https://github.com/lattices-dev/lattices/blob/81eaf74c2a015bf4c2f2f1901938d969a146437e/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "d00e5ea1c3921c54815fc9efae1f8c67074d51438c203246e2a40bdc9708f81b"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "mi3lix9__alrisali__apps__server__.env.schema",
+      "repo": "mi3lix9/alrisali",
+      "commit": "6879f5bbe5c36847c6407e65220cabdffe8c2884",
+      "path": "apps/server/.env.schema",
+      "url": "https://github.com/mi3lix9/alrisali/blob/6879f5bbe5c36847c6407e65220cabdffe8c2884/apps/server/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/server/.env.schema": "258282f50cb02818599ffac357bbb9fcda1b8cbf74bded684e58605110d228d9"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "mirzaianov__alsu-me__.env.schema",
+      "repo": "mirzaianov/alsu-me",
+      "commit": "727b2f8266c97b252c6a03077a457bf471e24dbe",
+      "path": ".env.schema",
+      "url": "https://github.com/mirzaianov/alsu-me/blob/727b2f8266c97b252c6a03077a457bf471e24dbe/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "5286f9f54063d8a5894d9b51c35cbb7eae4bcb4b21a1255550dd6ef855d59460"
+      },
+      "plugins": [
+        "@varlock/keepass-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/keepass-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "mohammedzamakhan__epic-startup__apps__app__.env.schema",
+      "repo": "mohammedzamakhan/epic-startup",
+      "commit": "bed7998c06e0c1948bdf651d6ae9fe2802565c76",
+      "path": "apps/app/.env.schema",
+      "url": "https://github.com/mohammedzamakhan/epic-startup/blob/bed7998c06e0c1948bdf651d6ae9fe2802565c76/apps/app/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE.md"
+      },
+      "files": {
+        "apps/app/.env.schema": "2ee22660e681a33b807252d067726e19cd53e28e6e004b5b384aa0ef131babd5",
+        "packages/audit/.env.schema": "1eb9afbf2fd276c98a257f781db9cfb42203c3095eb309d945deeb4012d369a3",
+        "packages/auth/.env.schema": "b3b3e2fc3be09f5e70921ade7c03b625307670efe1bc19a235805a2d9cd476f0",
+        "packages/cache/.env.schema": "2f3c7a3cff03ae5d32a736eb3dc4d03c6c77451a2fc1dad3b178f2954ce3a98c",
+        "packages/database/.env.schema": "22db3b954adadd6f8510f5ec0c86048c429463755e2596798691178f00b61d5c",
+        "packages/email/.env.schema": "7632e148867d50252973de4c2086faa0210ce5af6de98dca350b228f0ab33982",
+        "packages/integrations/.env.schema": "053fafe41c3d8e9c3f92916a253b3ebeb40df0dd12c36efe6650f1872ec46c4e",
+        "packages/observability/.env.schema": "e8391f1c1030d23acc49865c4cd4fd8858d4519975d3c27dbf62cf3515ac9243",
+        "packages/payments/.env.schema": "03fe873af50d0bef76c613a3d8db365e55ab813c89e524f5c0c9b55d8f3645f3",
+        "packages/security/.env.schema": "33fb5377befeeb660c183082c79b5556fb66e3e61329ffe06ddc7f895af537cd",
+        "packages/tenant-db/.env.schema": "864e526c4c4c051dcfd415bcaa71826f09d6c9274f573e4eeb1a9abc9c312666"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "mohammedzamakhan__epic-startup__apps__tenant-api__.env.schema",
+      "repo": "mohammedzamakhan/epic-startup",
+      "commit": "bed7998c06e0c1948bdf651d6ae9fe2802565c76",
+      "path": "apps/tenant-api/.env.schema",
+      "url": "https://github.com/mohammedzamakhan/epic-startup/blob/bed7998c06e0c1948bdf651d6ae9fe2802565c76/apps/tenant-api/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE.md"
+      },
+      "files": {
+        "apps/tenant-api/.env.schema": "c0ee92c3b2a45e0e01bf7a7f6d4344a6881da656071ce22416ed7c8c6f412e1d",
+        "packages/cache/.env.schema": "2f3c7a3cff03ae5d32a736eb3dc4d03c6c77451a2fc1dad3b178f2954ce3a98c",
+        "packages/database/.env.schema": "22db3b954adadd6f8510f5ec0c86048c429463755e2596798691178f00b61d5c",
+        "packages/email/.env.schema": "7632e148867d50252973de4c2086faa0210ce5af6de98dca350b228f0ab33982",
+        "packages/sms/.env.schema": "e3cff1cabf89b21e4b0b2a56eb47b795c80360710aa2e0ae57f0778516816d7b",
+        "packages/tenant-db/.env.schema": "864e526c4c4c051dcfd415bcaa71826f09d6c9274f573e4eeb1a9abc9c312666"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "MSFT-TKENDRICK__ado-to-github-teams__.env.schema",
+      "repo": "MSFT-TKENDRICK/ado-to-github-teams",
+      "commit": "18b9d4c72cb4235e0cd9820210cf518e43f065c8",
+      "path": ".env.schema",
+      "url": "https://github.com/MSFT-TKENDRICK/ado-to-github-teams/blob/18b9d4c72cb4235e0cd9820210cf518e43f065c8/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "0082a4262130c6e4d49e139fce3ba45f767c667f5b549dcdb0138c21b957eed4"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "NathanAB__statuslin.es__.env.schema",
+      "repo": "NathanAB/statuslin.es",
+      "commit": "ea525c0ef7aa146c7b50c9b4815c80faef46dfc4",
+      "path": ".env.schema",
+      "url": "https://github.com/NathanAB/statuslin.es/blob/ea525c0ef7aa146c7b50c9b4815c80faef46dfc4/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "a4f3061f935a421454cdcb5d4ca667a10ffceffa282e5f4c4b60f998a32cf5b6"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "nickytonline__nickytdotco__.env.schema",
+      "repo": "nickytonline/nickytdotco",
+      "commit": "2e0d34aeb2b505c8acf0f05cdcf5c880064a695d",
+      "path": ".env.schema",
+      "url": "https://github.com/nickytonline/nickytdotco/blob/2e0d34aeb2b505c8acf0f05cdcf5c880064a695d/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE.txt"
+      },
+      "files": {
+        ".env.schema": "9f60346824350cbbf013cf47a84b671dbe8fb1542152ab757aa3a0a3aa791d3e"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "nickytonline__nickytdotco__env__search__.env.schema",
+      "repo": "nickytonline/nickytdotco",
+      "commit": "2e0d34aeb2b505c8acf0f05cdcf5c880064a695d",
+      "path": "env/search/.env.schema",
+      "url": "https://github.com/nickytonline/nickytdotco/blob/2e0d34aeb2b505c8acf0f05cdcf5c880064a695d/env/search/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE.txt"
+      },
+      "files": {
+        "env/search/.env.schema": "f38ef0cb7745120b21415ceac292884437012c1a8cf7ac2ea8c9a4fb87dd6138"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "oakoss__finance-tracker__.env.schema",
+      "repo": "oakoss/finance-tracker",
+      "commit": "534948f4b2fb0e9c717c48522680870c7e55e798",
+      "path": ".env.schema",
+      "url": "https://github.com/oakoss/finance-tracker/blob/534948f4b2fb0e9c717c48522680870c7e55e798/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "9d88d4cf2cf6da4867a1d2ca0343453fdf7549780966af50a70b20c567a2f920"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "onderwijsin__onderwijsloket-assistent__envs__.env.schema",
+      "repo": "onderwijsin/onderwijsloket-assistent",
+      "commit": "56b4cd3c67f21456a59691af3aa807ccbf737832",
+      "path": "envs/.env.schema",
+      "url": "https://github.com/onderwijsin/onderwijsloket-assistent/blob/56b4cd3c67f21456a59691af3aa807ccbf737832/envs/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "envs/.env.schema": "4296a141a6d87ffa6c398324626bc250bcdedd9cd7fe4c0eccd07d6707f3009c",
+        "envs/schemas/.env.algolia": "1f78aa744f8ae4fb58f3ec63b706f22975512b83d08dfa8b685ca3f303cac429",
+        "envs/schemas/.env.core": "222bd95c16cce05675f59c88ab973d5eabf596a8a4ac40f92899a28f60dec451",
+        "envs/schemas/.env.dev": "49b8f883722d16daa4de12bd0c88ca200c98731cb8f788d9471478c365d16187",
+        "envs/schemas/.env.directus": "eece9ad9f6306d69eaf0f391307e5a7c4994b8e16cbaec03a025941d3c2aa2b3",
+        "envs/schemas/.env.mapbox": "b5339d4ebeff91ab92eaaad540a67b3df1eb4f693596dca47dfae8328848b3a5",
+        "envs/schemas/.env.savvycal": "e031345889273772f72e151d87f7c6d38fd6ec0da38527ba0220948dcd23b003"
+      },
+      "plugins": [
+        "@varlock/proton-pass-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/proton-pass-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "onderwijsin__onderwijsloket-docs__envs__.env.schema",
+      "repo": "onderwijsin/onderwijsloket-docs",
+      "commit": "93b620bdb79cd6df04da78e5f89d7315a7202e26",
+      "path": "envs/.env.schema",
+      "url": "https://github.com/onderwijsin/onderwijsloket-docs/blob/93b620bdb79cd6df04da78e5f89d7315a7202e26/envs/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "envs/.env.schema": "b226f24327bac5c95c766b4146b04aa2053af12e910049c5aa6fab24badee194",
+        "envs/schemas/.env.core": "4ed248221e4e8110d407324dc6f8a74426120b84c976d6fdb917a766151e7072",
+        "envs/schemas/.env.dev": "49b8f883722d16daa4de12bd0c88ca200c98731cb8f788d9471478c365d16187",
+        "envs/schemas/.env.directus": "eca3443659f314c9b0334286eaf5c0e36a7c959fc28f822ddd50bc559f791a72",
+        "envs/schemas/.env.docus": "3f3e004cce8f063d17cf4453723eb2130e841a04a86c2ecdc7b3374b5afa00e5"
+      },
+      "plugins": [
+        "@varlock/proton-pass-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/proton-pass-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "pollaroit__bbrc__apps__web__.env.schema",
+      "repo": "pollaroit/bbrc",
+      "commit": "80d7537e4ea3c3981de25ec872081f82369874c6",
+      "path": "apps/web/.env.schema",
+      "url": "https://github.com/pollaroit/bbrc/blob/80d7537e4ea3c3981de25ec872081f82369874c6/apps/web/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/web/.env.schema": "f4f1f0107b98b0c3df8efff5970d80e08d9759c4fb4102086558ba2425c89a34"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "proofsh__proofkit__.env.schema",
+      "repo": "proofsh/proofkit",
+      "commit": "cb489a002f2de740308c590691d782edb8538298",
+      "path": ".env.schema",
+      "url": "https://github.com/proofsh/proofkit/blob/cb489a002f2de740308c590691d782edb8538298/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE.md"
+      },
+      "files": {
+        ".env.schema": "f94721a2dc8b0381fcf90d944f06b5f8a41fe7c2311f9b9da296a1f11d9f3d0a"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "pvarki__battlelog__server__.env.schema",
+      "repo": "pvarki/battlelog",
+      "commit": "e93ad1152cf1a3ba82f8a186dbd68ac818f9e1f7",
+      "path": "server/.env.schema",
+      "url": "https://github.com/pvarki/battlelog/blob/e93ad1152cf1a3ba82f8a186dbd68ac818f9e1f7/server/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "server/.env.schema": "f73609190e3ce399115f4c7904878cdbf7a921d4ad17231b53d6e66ed2bd0564"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "rbadillap__registry.directory__apps__web__.env.schema",
+      "repo": "rbadillap/registry.directory",
+      "commit": "cf400f3828347571e0072c9b2dd3baecc707d023",
+      "path": "apps/web/.env.schema",
+      "url": "https://github.com/rbadillap/registry.directory/blob/cf400f3828347571e0072c9b2dd3baecc707d023/apps/web/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/web/.env.schema": "fc967c75c2a68c76b2a6098378fe771dd9d6dbe0764db1f3ee74f3b79dacc98a"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "rodaddy__open-brain__.env.schema",
+      "repo": "rodaddy/open-brain",
+      "commit": "1f8070a7233d9b66c62a325c473f85021006d8e0",
+      "path": ".env.schema",
+      "url": "https://github.com/rodaddy/open-brain/blob/1f8070a7233d9b66c62a325c473f85021006d8e0/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "e4d8649bd004ae109faba81645994d7b0e6fdc6e938acc5fad8ba275aec04990"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "expectErrors": "Schema defect: prose in the header comment (`# @secret(exec(./fetch-secrets.sh NAME)) entries call ...`, line 4) is parsed as a decorator call and fails to parse.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "sakanastudio24-eng__Ward-Studio__.env.schema",
+      "repo": "sakanastudio24-eng/Ward-Studio",
+      "commit": "26c7d6e94442e5e9cc698356d3a65fb0ada35780",
+      "path": ".env.schema",
+      "url": "https://github.com/sakanastudio24-eng/Ward-Studio/blob/26c7d6e94442e5e9cc698356d3a65fb0ada35780/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "e99fc879f6241fbc8bcbb26913690aa3c4ce589aba37aab0dca4c234bc8c61bc"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "samaluk__homelab__.agents__skills__homelab-komodo__scripts__komodo__.env.schema",
+      "repo": "samaluk/homelab",
+      "commit": "eaa42bd503d3013ec48cdc4c06c6563d4d314ee4",
+      "path": ".agents/skills/homelab-komodo/scripts/komodo/.env.schema",
+      "url": "https://github.com/samaluk/homelab/blob/eaa42bd503d3013ec48cdc4c06c6563d4d314ee4/.agents/skills/homelab-komodo/scripts/komodo/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".agents/skills/homelab-komodo/scripts/komodo/.env.schema": "57c3cd1f73c2133de7f0faa1f22f5ac505ae2173caa6930883bf4ca88ecb261e"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "schalkneethling__linkstack__.env.schema",
+      "repo": "schalkneethling/linkstack",
+      "commit": "2f26867f6cebe9326458ecc0404b11dea677b752",
+      "path": ".env.schema",
+      "url": "https://github.com/schalkneethling/linkstack/blob/2f26867f6cebe9326458ecc0404b11dea677b752/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "224fe8dafdbdbb0fccced2b9eabe8ffcff1a2670adecbee1cdce596153331166"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "schalkneethling__ossreleasefeed-v2__.env.schema",
+      "repo": "schalkneethling/ossreleasefeed-v2",
+      "commit": "98cac7c6c9ff1ec5df39b456103aa3a49f7fe994",
+      "path": ".env.schema",
+      "url": "https://github.com/schalkneethling/ossreleasefeed-v2/blob/98cac7c6c9ff1ec5df39b456103aa3a49f7fe994/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "53f77795b228af7b72c6805ee9d08453a9ee302b515217af136d8d7bddb37d19"
+      },
+      "plugins": [
+        "@varlock/1password-plugin"
+      ],
+      "unresolved": [],
+      "expectErrors": "@varlock/1password-plugin is not installed anywhere this fixture can resolve it (tests never install plugins), so loading stops at that @plugin.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "szigetidev__racona-core__apps__web__.env.schema",
+      "repo": "szigetidev/racona-core",
+      "commit": "a26468d4bc2d2e1f81e521e38e3aae76951585fd",
+      "path": "apps/web/.env.schema",
+      "url": "https://github.com/szigetidev/racona-core/blob/a26468d4bc2d2e1f81e521e38e3aae76951585fd/apps/web/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/web/.env.schema": "c63b768846e459f1b53efc7189ecf7a7a86e770ce61b1047fb64a00d12177f41"
+      },
+      "plugins": [],
+      "unresolved": [
+        ".env.local"
+      ],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "Toshi7878__YTyping__.env.schema",
+      "repo": "Toshi7878/YTyping",
+      "commit": "96b3a14caefc0153467fe2b1db5226c1a576a4a0",
+      "path": ".env.schema",
+      "url": "https://github.com/Toshi7878/YTyping/blob/96b3a14caefc0153467fe2b1db5226c1a576a4a0/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "f8a85aa9d6f01830bec0a682d90ef30ddfc96c147b0b3085490a6eefe5ea08b0"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "treycausey__airship__.env.schema",
+      "repo": "treycausey/airship",
+      "commit": "d2937346647d9242ad8f3ae0e68cbb36371f80e9",
+      "path": ".env.schema",
+      "url": "https://github.com/treycausey/airship/blob/d2937346647d9242ad8f3ae0e68cbb36371f80e9/.env.schema",
+      "license": {
+        "spdx": "MIT",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "3c665c1756c25e3d0ebfb05a02d5fc805113fb1c7a7991c8d52c1846b7c14238"
+      },
+      "plugins": [
+        "@varlock/bitwarden-plugin@2.0.2"
+      ],
+      "unresolved": [],
+      "expectErrors": "The schema pins @varlock/bitwarden-plugin@2.0.2, which is not installed or cached here and is never downloaded in shape mode, so loading stops at that @plugin. Tests never install plugins.",
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "triggerdotdev__trigger.dev__apps__supervisor__.env.schema",
+      "repo": "triggerdotdev/trigger.dev",
+      "commit": "58c358efa7df1b1f029dc3d031bcaf01858c245b",
+      "path": "apps/supervisor/.env.schema",
+      "url": "https://github.com/triggerdotdev/trigger.dev/blob/58c358efa7df1b1f029dc3d031bcaf01858c245b/apps/supervisor/.env.schema",
+      "license": {
+        "spdx": "Apache-2.0",
+        "file": "LICENSE"
+      },
+      "files": {
+        ".env.schema": "5ebe16eb9a5597223107cb3ea9daf4080f10a403fbe39cb5b42c1dcb97d2ebbc",
+        "apps/supervisor/.env.schema": "4c1a117e477748b85786c41b4b2d72d9ba8fcbe20f5a7183dd13cf3c6305293a"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    },
+    {
+      "id": "xiduzo__nightshift__apps__server__.env.schema",
+      "repo": "xiduzo/nightshift",
+      "commit": "c7834735deba2ab86e5a361c04823f0ac9f0f4e4",
+      "path": "apps/server/.env.schema",
+      "url": "https://github.com/xiduzo/nightshift/blob/c7834735deba2ab86e5a361c04823f0ac9f0f4e4/apps/server/.env.schema",
+      "license": {
+        "spdx": "Apache-2.0",
+        "file": "LICENSE"
+      },
+      "files": {
+        "apps/server/.env.schema": "eeae554cf5bcf008bfb3edb41de827742e117c1a8b306403b72e7d07fb9e7308"
+      },
+      "plugins": [],
+      "unresolved": [],
+      "addedAt": "2026-10-24"
+    }
+  ]
+}
