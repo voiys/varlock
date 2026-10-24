@@ -894,7 +894,8 @@ export abstract class FileBasedDataSource extends EnvGraphDataSource {
     this.relativePath = path.relative(process.cwd(), fullPath);
 
     // easy way to allow tests to override contents or other non-standard ways of loading content
-    if (opts?.overrideContents) {
+    // (an empty string is valid override content, so we only skip when it is not provided)
+    if (opts?.overrideContents !== undefined) {
       this.rawContents = opts.overrideContents;
     }
 
@@ -932,7 +933,7 @@ export abstract class FileBasedDataSource extends EnvGraphDataSource {
 
   // no async constructors... :(
   async _finishInit() {
-    if (!this.rawContents) {
+    if (this.rawContents === undefined) {
       if (!await pathExists(this.fullPath)) {
         this._errors.push(new LoadingError(`File does not exist: ${this.fullPath}`));
         return;
