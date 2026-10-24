@@ -63,7 +63,16 @@ for (const pluginDir of pluginDirs) {
   }
   const current = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, 'utf-8') : undefined;
   const relManifest = path.relative(MONOREPO_ROOT, manifestPath);
-  if (current === contents) {
+  // compared as parsed JSON: `lint:fix` reformats committed json (e.g. collapses short arrays), which is fine
+  let isCurrent = current === contents;
+  if (!isCurrent && current !== undefined) {
+    try {
+      isCurrent = JSON.stringify(JSON.parse(current)) === JSON.stringify(JSON.parse(contents));
+    } catch {
+      isCurrent = false;
+    }
+  }
+  if (isCurrent) {
     console.log(`${relManifest} is up to date`);
   } else if (checkOnly) {
     problems.push(`${relManifest} is out of date`);
