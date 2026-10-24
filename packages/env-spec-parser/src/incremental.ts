@@ -15,6 +15,10 @@ export type IncrementalParseResult = {
   newEnd: number;
   /** nodes parsed for this edit (including the one re-checked before it) */
   nodesParsed: number;
+  /** lines added (negative: removed) by the edit */
+  lineDelta: number;
+  /** first line (1-based, old numbering) of the old text after the edit that was kept; lines from here moved by lineDelta */
+  oldResumeLine: number;
 };
 
 type PegLibraryResult = {
@@ -116,7 +120,7 @@ export function reparseEnvSpecIncremental(
   const p = commonPrefix(prevText, nextText);
   if (p === prevText.length && p === nextText.length) {
     return {
-      file: prev, oldStart: 0, oldEnd: 0, newStart: 0, newEnd: 0, nodesParsed: 0,
+      file: prev, oldStart: 0, oldEnd: 0, newStart: 0, newEnd: 0, nodesParsed: 0, lineDelta: 0, oldResumeLine: Infinity,
     };
   }
   const sfx = commonSuffix(prevText, nextText, Math.min(prevText.length, nextText.length) - p);
@@ -185,10 +189,13 @@ export function reparseEnvSpecIncremental(
     pos = r.end;
   }
   if (k === -1) k = nodes.length;
+  let dLine = 0;
+  let oldResumeLine = Infinity;
   if (k < nodes.length) {
     // lines added by the edit, between the restart point and the resync point
     const syncOld = startOf(nodes[k]);
-    const dLine = countNewlines(nextText, ws, syncOld + delta) - countNewlines(prevText, ws, syncOld);
+    oldResumeLine = nodes[k].data._location.start.line;
+    dLine = countNewlines(nextText, ws, syncOld + delta) - countNewlines(prevText, ws, syncOld);
     for (let i = k; i < nodes.length; i++) shiftNodeLocations(nodes[i], delta, dLine);
   }
   const contents = [...nodes.slice(0, j), ...parsed, ...nodes.slice(k)];
@@ -199,5 +206,7 @@ export function reparseEnvSpecIncremental(
     newStart: j,
     newEnd: j + parsed.length,
     nodesParsed,
+    lineDelta: dLine,
+    oldResumeLine,
   };
 }

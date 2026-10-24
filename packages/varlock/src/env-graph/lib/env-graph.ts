@@ -354,6 +354,20 @@ export class EnvGraph {
    * source tree or item definitions after it, so any later change to them would need to clear these memos.
    */
   _loadSettled = false;
+
+  // -- bookkeeping for incremental updates (see incremental-graph.ts) --
+  /** @internal collects the key names referenced while one item is being processed */
+  _refCollector?: Set<string>;
+  /** @internal key -> every key name its processing referred to, existing or not */
+  _itemRefs = new Map<string, Set<string>>();
+  /** @internal keys whose processing produced a non-warning error (finishLoad's hasErrors) */
+  _itemProcessErrorKeys = new Set<string>();
+  /** @internal a root decorator had a non-warning error after processing */
+  _rootDecProcessHasErrors = false;
+  /** @internal finishLoad found dependency cycles */
+  _foundCycles = false;
+  /** @internal resolveEnvValues() ran over every item */
+  _allResolved = false;
   private _sortedDataSourcesMemo?: Array<EnvGraphDataSource>;
   private _sortedDefinitionSourcesMemo?: Array<DefinitionSourceEntry>;
 
@@ -683,6 +697,7 @@ export class EnvGraph {
         if (decInstance.schemaErrors.some((e) => !e.isWarning)) hasErrors = true;
       }
     }
+    this._rootDecProcessHasErrors = hasErrors;
 
     // apply global cache policy early so plugin modules see the final setting
     // when @plugin decorators execute below.
@@ -785,14 +800,23 @@ export class EnvGraph {
     for (const itemKey in this.configSchema) {
       const item = this.configSchema[itemKey];
       await item.process();
-      if (item.errors.some((e) => !e.isWarning)) hasErrors = true;
+      if (item.errors.some((e) => !e.isWarning)) {
+        hasErrors = true;
+        this._itemProcessErrorKeys.add(itemKey);
+      }
     }
     this.configItemsProcessed = true;
 
-    if (hasErrors) return;
+    // nothing below changes the source tree or item definitions before the root decorators execute, and with
+    // errors they never do, so the structure can be memoized from here (much faster to resolve a broken schema)
+    if (hasErrors) {
+      this._loadSettled = true;
+      return;
+    }
 
     // check for cycles in resolver dependencies
     const cycles = findGraphCycles(this.graphAdjacencyList);
+    this._foundCycles = cycles.length > 0;
     for (const cycleItemKeys of cycles) {
       for (const itemKey of cycleItemKeys) {
         const item = this.configSchema[itemKey];
@@ -1047,11 +1071,15 @@ export class EnvGraph {
         resolveItem(itemKey).catch(reject);
       }
 
-      for (const itemKey in this.configSchema) {
-        startResolveItem(itemKey);
+      // with an explicit key list only those can start (the rest return at once), so skip the full scan
+      if (keys) {
+        for (const itemKey of keysToResolve) startResolveItem(itemKey);
+      } else {
+        for (const itemKey in this.configSchema) startResolveItem(itemKey);
       }
     });
     await deferred;
+    if (!keys) this._allResolved = true;
     this.checkForSensitiveValuesInsideNonSensitiveOnes();
   }
 

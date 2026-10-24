@@ -4,6 +4,7 @@ import { initVarlockEnv } from './runtime/env';
 import { checkBunVersion } from './lib/check-bun-version';
 
 import { parseEnvSpecDotEnvFile, reparseEnvSpecIncremental } from '@env-spec/parser';
+import { applyIncrementalSourceEdit } from './env-graph/lib/incremental-graph';
 // Import env-graph components for internal API
 import {
   EnvGraph,
@@ -58,6 +59,8 @@ export const internal = {
   // parser, for editors: a full parse, and a reparse of only what an edit touched
   parseEnvSpecDotEnvFile,
   reparseEnvSpecIncremental,
+  // update a loaded graph in place after an edit to its root schema file (experiment)
+  applyIncrementalSourceEdit,
   // Core classes
   EnvGraph,
   DotEnvFileDataSource,

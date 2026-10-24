@@ -311,7 +311,19 @@ export class ConfigItem {
   async process() {
     if (this.isProcessed) return;
     this.isProcessed = true;
+    // record every key name this item's resolvers and decorators refer to (see EnvGraph._itemRefs)
+    const prevCollector = this.envGraph._refCollector;
+    const refs = new Set<string>();
+    this.envGraph._refCollector = refs;
+    try {
+      await this._process();
+    } finally {
+      this.envGraph._refCollector = prevCollector;
+      this.envGraph._itemRefs.set(this.key, refs);
+    }
+  }
 
+  private async _process() {
     // process value resolver
     for (const def of this.defs) {
       if (def.itemDef.parsedValue && !def.itemDef.resolver) {

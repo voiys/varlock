@@ -250,6 +250,8 @@ export class Resolver {
 
   // meant to be used by subclass _process methods
   protected addDep(key: string) {
+    // every name an item refers to, existing or not, so an editor can find what an added or removed key affects
+    this.envGraph!._refCollector?.add(key);
     if (!this.envGraph!.configSchema[key]) {
       throw new Error(`invalid dependency: ${key}`);
     }
