@@ -1,0 +1,68 @@
+{
+  "manifestVersion": 1,
+  "name": "@varlock/akeyless-plugin",
+  "standardVars": {
+    "initDecorator": "@initAkeyless",
+    "params": {
+      "accessId": {
+        "key": "AKEYLESS_ACCESS_ID",
+        "dataType": "akeylessAccessId"
+      },
+      "accessKey": {
+        "key": "AKEYLESS_ACCESS_KEY",
+        "dataType": "akeylessAccessKey"
+      }
+    }
+  },
+  "rootDecorators": [
+    {
+      "name": "initAkeyless",
+      "description": "Initialize an Akeyless plugin instance for akeyless() resolver",
+      "isFunction": true
+    }
+  ],
+  "itemDecorators": [],
+  "dataTypes": [
+    {
+      "name": "akeylessAccessId",
+      "typeDescription": "Akeyless Access ID for API Key authentication",
+      "docs": [
+        {
+          "description": "Akeyless API Key Authentication",
+          "url": "https://docs.akeyless.io/docs/api-key"
+        }
+      ],
+      "validationRules": [
+        {
+          "startsWith": "p-",
+          "message": "Akeyless Access ID should start with \"p-\"",
+          "tip": "API Key Access IDs start with \"p-\" (e.g., \"p-abc123def456\")"
+        }
+      ]
+    },
+    {
+      "name": "akeylessAccessKey",
+      "typeDescription": "Akeyless Access Key for API Key authentication",
+      "sensitive": true,
+      "internal": true,
+      "docs": [
+        {
+          "description": "Akeyless API Key Authentication",
+          "url": "https://docs.akeyless.io/docs/api-key"
+        }
+      ]
+    }
+  ],
+  "resolvers": [
+    {
+      "name": "akeyless",
+      "label": "Fetch secret from Akeyless",
+      "argsSchema": {
+        "type": "mixed",
+        "arrayMinLength": 0,
+        "arrayMaxLength": 2
+      }
+    }
+  ],
+  "codeGenerators": []
+}

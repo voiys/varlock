@@ -35,6 +35,12 @@
           "description": "1Password service accounts",
           "url": "https://developer.1password.com/docs/service-accounts/"
         }
+      ],
+      "validationRules": [
+        {
+          "startsWith": "ops_",
+          "message": "Service account tokens must start with ops_"
+        }
       ]
     },
     {

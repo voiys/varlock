@@ -4,8 +4,9 @@
  * without running the plugin. The manifest is generated from the built plugin, so it never has to
  * be edited by hand, and `--check` keeps the committed copy in sync with the plugin code.
  *
- * With no directories given, it handles every package in packages/plugins that has a
- * `./manifest` export. This runs each plugin's code, so build first.
+ * With no directories given, it handles every package in packages/plugins, and each one must
+ * have a `./manifest` export. This runs each plugin's code, so build first. Generating a manifest
+ * also checks that each data type's `validationRules` agree with its `validate()`.
  *
  * Usage (after building):
  *   bun run plugin-manifests                 # regenerate committed manifests
@@ -29,10 +30,17 @@ function hasManifestExport(pluginDir: string): boolean {
   return pkgJson.exports?.['./manifest'] !== undefined;
 }
 
-const pluginDirs = explicitDirs.length
-  ? explicitDirs
-  : fs.readdirSync(PLUGINS_DIR).sort().map((d) => path.join(PLUGINS_DIR, d))
-    .filter((d) => fs.existsSync(path.join(d, 'package.json')) && hasManifestExport(d));
+const problems: Array<string> = [];
+let pluginDirs = explicitDirs;
+if (!explicitDirs.length) {
+  pluginDirs = fs.readdirSync(PLUGINS_DIR).sort().map((d) => path.join(PLUGINS_DIR, d))
+    .filter((d) => fs.existsSync(path.join(d, 'package.json')));
+  // every first-party plugin ships a manifest, so shape mode never has to run one
+  for (const dir of pluginDirs.filter((d) => !hasManifestExport(d))) {
+    problems.push(`${path.relative(MONOREPO_ROOT, dir)}: no "./manifest" export in package.json (add "./manifest": "./plugin-manifest.json" and list the file in "files")`);
+  }
+  pluginDirs = pluginDirs.filter(hasManifestExport);
+}
 
 if (!fs.existsSync(VARLOCK_DIST)) {
   console.error('varlock is not built: run `bun run build:libs` first');
@@ -40,7 +48,6 @@ if (!fs.existsSync(VARLOCK_DIST)) {
 }
 const { internal } = await import(pathToFileURL(VARLOCK_DIST).href);
 
-const problems: Array<string> = [];
 for (const pluginDir of pluginDirs) {
   const relDir = path.relative(MONOREPO_ROOT, pluginDir);
   let contents: string;

@@ -1044,6 +1044,8 @@ plugin.registerDataType({
       url: 'https://learn.microsoft.com/en-us/azure/active-directory/fundamentals/how-to-find-tenant',
     },
   ],
+  validationRules: [{ matches: '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', message: 'Must be a valid UUID format (e.g., 12345678-1234-1234-1234-123456789012)' }],
+  validationSamples: ['72f988bf-86f1-41af-91ab-2d7cd011db47', '72F988BF-86F1-41AF-91AB-2D7CD011DB47', 'contoso.onmicrosoft.com'],
   async validate(val): Promise<true> {
     // Azure tenant IDs are UUIDs
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
@@ -1063,6 +1065,8 @@ plugin.registerDataType({
       url: 'https://learn.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal',
     },
   ],
+  validationRules: [{ matches: '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', message: 'Must be a valid UUID format (e.g., 12345678-1234-1234-1234-123456789012)' }],
+  validationSamples: ['12345678-1234-1234-1234-123456789012', '12345678-1234-1234-1234-12345678901z'],
   async validate(val): Promise<true> {
     // Azure client IDs are UUIDs
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
@@ -1094,6 +1098,21 @@ plugin.registerDataType({
       description: 'App Configuration access keys',
       url: 'https://learn.microsoft.com/en-us/azure/azure-app-configuration/howto-connect-app-configuration-connection-string',
     },
+  ],
+  validationRules: [
+    { matches: '/(^|;)\\s*Endpoint=/i', message: 'Must contain "Endpoint=" (expected format: Endpoint=...;Id=...;Secret=...)' },
+    { matches: '/(^|;)\\s*Id=/i', message: 'Must contain "Id=" (expected format: Endpoint=...;Id=...;Secret=...)' },
+    { matches: '/(^|;)\\s*Secret=/i', message: 'Must contain "Secret=" (expected format: Endpoint=...;Id=...;Secret=...)' },
+  ],
+  validationSamples: [
+    'Endpoint=https://x.azconfig.io;Id=abc;Secret=xyz',
+    'endpoint=https://x.azconfig.io; id=abc; secret=xyz',
+    'Id=abc;Secret=xyz',
+    'Endpoint=https://x.azconfig.io;Secret=xyz',
+    'Endpoint=https://x.azconfig.io;Id=abc',
+    // fails two rules, so the order of the checks matters
+    'Endpoint=https://x.azconfig.io',
+    'Endpoint=https://x.azconfig.io;XId=abc;Secret=xyz',
   ],
   async validate(val): Promise<true> {
     for (const part of ['Endpoint', 'Id', 'Secret']) {

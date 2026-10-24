@@ -58,7 +58,8 @@ jobs:
         run: bun run build:libs
       - name: Check plugin bundles are single-file
         run: bun run scripts/check-plugin-bundles.ts
-      # runs each built plugin that ships a manifest and compares it with the committed file
+      # runs each built plugin, compares its manifest with the committed file, and checks that its
+      # data types' validationRules agree with their validate(). Every plugin must ship a manifest
       - name: Check plugin manifests are up to date
         run: bun run plugin-manifests --check
       - name: Run tests

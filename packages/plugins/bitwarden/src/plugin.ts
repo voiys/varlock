@@ -414,6 +414,22 @@ plugin.registerDataType({
       url: 'https://bitwarden.com/help/secrets-manager-machine-accounts/',
     },
   ],
+  validationRules: [
+    {
+      // the same check as splitting on "." into 3 parts, the first "0" and the last containing ":"
+      matches: '/^0\\.[^.]*\\.[^.:]*:[^.]*$/',
+      message: 'Access token must be in format: 0.<client_id>.<client_secret>:<encryption_key>',
+    },
+  ],
+  validationSamples: [
+    '0.client-id.client-secret:encryption-key',
+    '0..:',
+    '1.client-id.client-secret:encryption-key',
+    '0.client-id.client-secret',
+    '0.client-id.client.secret:key',
+    '0.client-id:x.client-secret',
+    '00.client-id.client-secret:key',
+  ],
   async validate(val) {
     // Validate format: 0.<client_id>.<client_secret>:<encryption_key>
     const parts = val.split('.');
@@ -436,6 +452,8 @@ plugin.registerDataType({
       url: 'https://bitwarden.com/products/secrets-manager/',
     },
   ],
+  validationRules: [{ matches: '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', message: 'Secret ID must be a valid UUID' }],
+  validationSamples: ['12345678-1234-1234-1234-123456789012', 'my-secret'],
   async validate(val) {
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidPattern.test(val)) {
@@ -454,6 +472,8 @@ plugin.registerDataType({
       url: 'https://bitwarden.com/help/about-organizations/',
     },
   ],
+  validationRules: [{ matches: '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', message: 'Organization ID must be a valid UUID' }],
+  validationSamples: ['12345678-1234-1234-1234-123456789012', 'my-org'],
   async validate(val) {
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidPattern.test(val)) {
@@ -865,6 +885,7 @@ plugin.registerDataType({
       url: 'https://bitwarden.com/help/cli/#unlock',
     },
   ],
+  validationRules: [{ minLength: 1, message: 'Bitwarden session token must be a non-empty string' }],
   async validate(val) {
     if (typeof val !== 'string' || val.length === 0) {
       throw new ValidationError('Bitwarden session token must be a non-empty string');

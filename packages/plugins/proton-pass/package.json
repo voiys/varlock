@@ -11,10 +11,12 @@
     "directory": "packages/plugins/proton-pass"
   },
   "exports": {
-    "./plugin": "./dist/plugin.cjs"
+    "./plugin": "./dist/plugin.cjs",
+    "./manifest": "./plugin-manifest.json"
   },
   "files": [
     "dist",
+    "plugin-manifest.json",
     "BUNDLED_ICONS_LICENSES.md"
   ],
   "scripts": {

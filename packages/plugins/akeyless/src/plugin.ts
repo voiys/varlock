@@ -5,7 +5,8 @@ import ky from 'ky';
 import { createHash } from 'node:crypto';
 import { getOidcToken } from '@env-spec/utils/oidc-tokens';
 
-const { SchemaError, ResolutionError } = plugin.ERRORS;
+// read while the plugin context is active: plugin.ERRORS is not available later (e.g. inside validate())
+const { SchemaError, ResolutionError, ValidationError } = plugin.ERRORS;
 
 plugin.name = 'akeyless';
 const { debug } = plugin;
@@ -450,12 +451,20 @@ plugin.registerDataType({
       url: 'https://docs.akeyless.io/docs/api-key',
     },
   ],
+  validationRules: [
+    {
+      startsWith: 'p-',
+      message: 'Akeyless Access ID should start with "p-"',
+      tip: 'API Key Access IDs start with "p-" (e.g., "p-abc123def456")',
+    },
+  ],
+  validationSamples: ['p-abc123def456', 'abc123def456'],
   async validate(val): Promise<true> {
     if (typeof val !== 'string') {
-      throw new plugin.ERRORS.ValidationError('Must be a string');
+      throw new ValidationError('Must be a string');
     }
     if (!val.startsWith('p-')) {
-      throw new plugin.ERRORS.ValidationError('Akeyless Access ID should start with "p-"', {
+      throw new ValidationError('Akeyless Access ID should start with "p-"', {
         tip: 'API Key Access IDs start with "p-" (e.g., "p-abc123def456")',
       });
     }

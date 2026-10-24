@@ -225,6 +225,7 @@ plugin.registerDataType({
       url: 'https://keepassxc.org/docs/',
     },
   ],
+  validationRules: [{ minLength: 1, message: 'KeePass database password must be a non-empty string' }],
   async validate(val) {
     if (typeof val !== 'string' || val.length === 0) {
       throw new ValidationError('KeePass database password must be a non-empty string');

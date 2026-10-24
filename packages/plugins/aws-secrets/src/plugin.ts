@@ -598,6 +598,8 @@ plugin.registerDataType({
       url: 'https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html',
     },
   ],
+  validationRules: [{ matches: '/^[A-Z0-9]{20}$/', message: 'Must be a 20-character alphanumeric string (typically starts with AKIA)' }],
+  validationSamples: ['AKIAIOSFODNN7EXAMPLE', 'akiaiosfodnn7example', 'AKIAIOSFODNN7EXAMPLE1', 'AKIA123'],
   async validate(val): Promise<true> {
     // AWS access keys are typically 20 characters and alphanumeric
     if (!/^[A-Z0-9]{20}$/.test(val)) {
@@ -617,6 +619,8 @@ plugin.registerDataType({
       url: 'https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html',
     },
   ],
+  validationRules: [{ isLength: 40, message: 'Must be exactly 40 characters long' }],
+  validationSamples: ['wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', 'wJalrXUtnFEMI/K7MDENG'],
   async validate(val): Promise<true> {
     // AWS secret keys are typically 40 characters
     if (val.length !== 40) {

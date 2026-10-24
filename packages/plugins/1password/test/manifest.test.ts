@@ -14,7 +14,8 @@ const PLUGIN_PATH = path.join(__dirname, '..');
 const PLUGIN_ENTRY = path.join(PLUGIN_PATH, 'dist', 'plugin.cjs');
 
 // everything the plugin can add to a schema: both init forms, two instances, op() with an instance
-// id and allowMissing, opLoadEnvironment through @setValuesBulk, and both token data types
+// id and allowMissing, opLoadEnvironment through @setValuesBulk, and both token data types (one
+// with a value its validationRules reject)
 const schemaFor = (pluginDir: string) => outdent`
   # @currentEnv=$APP_ENV
   # @defaultRequired=false @defaultSensitive=false
@@ -29,6 +30,8 @@ const schemaFor = (pluginDir: string) => outdent`
   OP_TOKEN=
   # @type=opConnectToken
   OP_CONNECT_TOKEN=
+  # @type=opServiceAccountToken
+  BAD_OP_TOKEN=not-a-token
   DB_PASSWORD=op("op://Dev/db/password")
   API_KEY=op(ci, "op://Dev/api/key", allowMissing=true)
   # @sensitive
@@ -103,6 +106,7 @@ describe('1password plugin manifest', () => {
     expect(expected.sourceErrors).toEqual([]);
     expect(expected.items).toHaveProperty('OP_TOKEN.dataType.name', 'opServiceAccountToken');
     expect(expected.items).toHaveProperty('OP_TOKEN.isInternal', true);
+    expect(expected.items).toHaveProperty('BAD_OP_TOKEN.errors', ['Service account tokens must start with ops_']);
     expect(expected.registries[3]).toEqual(expect.arrayContaining(['op', 'opLoadEnvironment']));
     expect(await describeGraph(fromManifest)).toEqual(expected);
   });

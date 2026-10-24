@@ -11,9 +11,10 @@
     "directory": "packages/plugins/akeyless"
   },
   "exports": {
-    "./plugin": "./dist/plugin.cjs"
+    "./plugin": "./dist/plugin.cjs",
+    "./manifest": "./plugin-manifest.json"
   },
-  "files": ["dist"],
+  "files": ["dist", "plugin-manifest.json"],
   "scripts": {
     "dev": "tsdown --watch",
     "build": "tsdown",

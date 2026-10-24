@@ -380,6 +380,14 @@ plugin.registerDataType({
       url: 'https://docs.keeper.io/secrets-manager/secrets-manager/developer-sdk-library/javascript-sdk',
     },
   ],
+  validationRules: [
+    { matches: '/\\S/', message: 'Keeper Secrets Manager config token must be a non-empty string' },
+    {
+      custom: 'decodes from base64 and parses as JSON',
+      message: 'Keeper Secrets Manager config token must be a valid base64-encoded JSON string',
+    },
+  ],
+  validationSamples: ['eyJob3N0bmFtZSI6ImtlZXBlcnNlY3VyaXR5LmNvbSJ9', '   '],
   async validate(val) {
     if (typeof val !== 'string' || !val.trim()) {
       throw new ValidationError('Keeper Secrets Manager config token must be a non-empty string');

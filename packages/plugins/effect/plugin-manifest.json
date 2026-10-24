@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "name": "@varlock/effect-plugin",
+  "rootDecorators": [],
+  "itemDecorators": [],
+  "dataTypes": [],
+  "resolvers": [],
+  "codeGenerators": [
+    {
+      "decoratorName": "generateEffectConfig",
+      "knownOptions": ["effectVersion"]
+    }
+  ]
+}

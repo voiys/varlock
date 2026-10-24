@@ -320,6 +320,11 @@ plugin.registerDataType({
       url: 'https://cloud.google.com/secret-manager/docs',
     },
   ],
+  validationRules: [
+    {
+      custom: 'parses as JSON (or takes an object) and requires a service_account key with project_id, private_key and client_email',
+    },
+  ],
   async validate(val): Promise<true> {
     // Accept string (JSON) or object
     let parsed;

@@ -602,6 +602,11 @@ plugin.registerDataType({
       url: 'https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/',
     },
   ],
+  validationRules: [
+    // the same check as a non-empty trim(): \\s matches what trim() removes
+    { matches: '/\\S/', message: 'Must be a non-empty bearer token' },
+  ],
+  validationSamples: ['eyJhbGciOiJSUzI1NiIs', '   ', ' \\n '],
   async validate(val): Promise<true> {
     if (typeof val !== 'string' || val.trim().length === 0) {
       throw new ValidationError('Must be a non-empty bearer token');

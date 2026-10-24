@@ -416,6 +416,23 @@ plugin.registerDataType({
       url: 'https://protonpass.github.io/pass-cli/commands/contents/secret-references/',
     },
   ],
+  validationRules: [
+    { startsWith: 'pass://', message: 'Secret reference must start with `pass://`' },
+    {
+      // 3 "/"-separated parts, none of them blank
+      matches: '/^pass://\\s*[^/\\s][^/]*/\\s*[^/\\s][^/]*/\\s*[^/\\s][^/]*$/',
+      message: 'Secret reference must be in format `pass://<vault>/<item>/<field>` (exactly 3 components)',
+    },
+  ],
+  validationSamples: [
+    'pass://vault/item/field',
+    'pass:// vault / item / field ',
+    'vault/item/field',
+    'pass://vault/item',
+    'pass://vault/ /field',
+    'pass://vault/item/field/extra',
+    'pass:///item/field',
+  ],
   async validate(val) {
     if (typeof val !== 'string') throw new ValidationError('Secret reference must be a string');
     if (!val.startsWith('pass://')) throw new ValidationError('Secret reference must start with `pass://`');
@@ -439,6 +456,7 @@ plugin.registerDataType({
       url: 'https://protonpass.github.io/pass-cli/commands/login/',
     },
   ],
+  validationRules: [{ minLength: 1, message: 'Password must be a non-empty string' }],
   async validate(val): Promise<true> {
     if (!val || typeof val !== 'string') throw new ValidationError('Password must be a non-empty string');
     return true;
@@ -450,6 +468,12 @@ plugin.registerDataType({
   sensitive: true,
   internal: true,
   typeDescription: 'Proton Pass TOTP code used by `pass-cli login --interactive` (if 2FA is enabled)',
+  validationRules: [
+    { minLength: 1, message: 'TOTP must be a non-empty string' },
+    // the same check as testing the trimmed value against /^[0-9]{6,8}$/
+    { matches: '/^\\s*[0-9]{6,8}\\s*$/', message: 'TOTP should be 6-8 digits' },
+  ],
+  validationSamples: ['123456', ' 1234567 ', '12345678', '12345', '123456789', 'abcdef'],
   async validate(val): Promise<true> {
     if (!val || typeof val !== 'string') throw new ValidationError('TOTP must be a non-empty string');
     if (!/^[0-9]{6,8}$/.test(val.trim())) throw new ValidationError('TOTP should be 6-8 digits');
@@ -462,6 +486,7 @@ plugin.registerDataType({
   sensitive: true,
   internal: true,
   typeDescription: 'Proton Pass extra password used by `pass-cli login --interactive` (if required by your account)',
+  validationRules: [{ minLength: 1, message: 'Extra password must be a non-empty string' }],
   async validate(val): Promise<true> {
     if (!val || typeof val !== 'string') throw new ValidationError('Extra password must be a non-empty string');
     return true;
@@ -479,6 +504,11 @@ plugin.registerDataType({
       url: 'https://protonpass.github.io/pass-cli/commands/login/#personal-access-token-login',
     },
   ],
+  validationRules: [
+    { minLength: 1, message: 'Personal access token must be a non-empty string' },
+    { includes: '::', message: 'Personal access token looks malformed - expected `pst_...::TOKENKEY`' },
+  ],
+  validationSamples: ['pst_abc123::TOKENKEY', 'pst_abc123:TOKENKEY'],
   async validate(val): Promise<true> {
     if (!val || typeof val !== 'string') throw new ValidationError('Personal access token must be a non-empty string');
     // Tokens are issued in the shape `pst_xxxx...xxxx::TOKENKEY`.

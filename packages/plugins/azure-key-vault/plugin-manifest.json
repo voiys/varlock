@@ -1,0 +1,140 @@
+{
+  "manifestVersion": 1,
+  "name": "@varlock/azure-key-vault-plugin",
+  "icon": "simple-icons:microsoftazure",
+  "bundledIcons": {
+    "simple-icons:microsoftazure": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M22.379 23.343a1.62 1.62 0 0 0 1.536-2.14v.002L17.35 1.76A1.62 1.62 0 0 0 15.816.657H8.184A1.62 1.62 0 0 0 6.65 1.76L.086 21.204a1.62 1.62 0 0 0 1.536 2.139h4.741a1.62 1.62 0 0 0 1.535-1.103l.977-2.892l4.947 3.675c.28.208.618.32.966.32m-3.084-12.531l3.624 10.739a.54.54 0 0 1-.51.713v-.001h-.03a.54.54 0 0 1-.322-.106l-9.287-6.9h4.853m6.313 7.006c.116-.326.13-.694.007-1.058L9.79 1.76l-.007-.02h6.034a.54.54 0 0 1 .512.366l6.562 19.445a.54.54 0 0 1-.338.684\"/></svg>"
+  },
+  "standardVars": {
+    "initDecorator": "@initAzure",
+    "params": {
+      "tenantId": {
+        "key": "AZURE_TENANT_ID"
+      },
+      "clientId": {
+        "key": "AZURE_CLIENT_ID"
+      },
+      "clientSecret": {
+        "key": "AZURE_CLIENT_SECRET"
+      },
+      "appConfigEndpoint": {
+        "key": "AZURE_APPCONFIG_ENDPOINT"
+      },
+      "appConfigConnectionString": {
+        "key": "AZURE_APPCONFIG_CONNECTION_STRING",
+        "dataType": "azureAppConfigConnectionString"
+      }
+    }
+  },
+  "rootDecorators": [
+    {
+      "name": "initAzure",
+      "description": "Initialize an Azure plugin instance for the azureSecret() and azureAppConfig() resolvers",
+      "isFunction": true
+    }
+  ],
+  "itemDecorators": [],
+  "dataTypes": [
+    {
+      "name": "azureTenantId",
+      "typeDescription": "Azure AD tenant ID (directory ID) for authentication",
+      "sensitive": false,
+      "docs": [
+        {
+          "description": "How to find your Azure AD tenant ID",
+          "url": "https://learn.microsoft.com/en-us/azure/active-directory/fundamentals/how-to-find-tenant"
+        }
+      ],
+      "validationRules": [
+        {
+          "matches": "/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
+          "message": "Must be a valid UUID format (e.g., 12345678-1234-1234-1234-123456789012)"
+        }
+      ]
+    },
+    {
+      "name": "azureClientId",
+      "typeDescription": "Azure service principal application (client) ID",
+      "sensitive": false,
+      "docs": [
+        {
+          "description": "Creating a service principal",
+          "url": "https://learn.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal"
+        }
+      ],
+      "validationRules": [
+        {
+          "matches": "/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
+          "message": "Must be a valid UUID format (e.g., 12345678-1234-1234-1234-123456789012)"
+        }
+      ]
+    },
+    {
+      "name": "azureClientSecret",
+      "typeDescription": "Azure service principal client secret (password)",
+      "sensitive": true,
+      "docs": [
+        {
+          "description": "Creating a service principal",
+          "url": "https://learn.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal"
+        }
+      ]
+    },
+    {
+      "name": "azureAppConfigConnectionString",
+      "typeDescription": "Azure App Configuration access key connection string (Endpoint=...;Id=...;Secret=...)",
+      "sensitive": true,
+      "internal": true,
+      "docs": [
+        {
+          "description": "App Configuration access keys",
+          "url": "https://learn.microsoft.com/en-us/azure/azure-app-configuration/howto-connect-app-configuration-connection-string"
+        }
+      ],
+      "validationRules": [
+        {
+          "matches": "/(^|;)\\s*Endpoint=/i",
+          "message": "Must contain \"Endpoint=\" (expected format: Endpoint=...;Id=...;Secret=...)"
+        },
+        {
+          "matches": "/(^|;)\\s*Id=/i",
+          "message": "Must contain \"Id=\" (expected format: Endpoint=...;Id=...;Secret=...)"
+        },
+        {
+          "matches": "/(^|;)\\s*Secret=/i",
+          "message": "Must contain \"Secret=\" (expected format: Endpoint=...;Id=...;Secret=...)"
+        }
+      ]
+    }
+  ],
+  "resolvers": [
+    {
+      "name": "azureSecret",
+      "label": "Fetch secret from Azure Key Vault",
+      "argsSchema": {
+        "type": "mixed",
+        "arrayMinLength": 0,
+        "arrayMaxLength": 2
+      }
+    },
+    {
+      "name": "azureAppConfig",
+      "label": "Fetch setting from Azure App Configuration",
+      "argsSchema": {
+        "type": "mixed",
+        "arrayMinLength": 0,
+        "arrayMaxLength": 2
+      }
+    },
+    {
+      "name": "azureAppConfigBulk",
+      "label": "Load settings from Azure App Configuration as JSON",
+      "argsSchema": {
+        "type": "mixed",
+        "arrayMinLength": 0,
+        "arrayMaxLength": 1
+      }
+    }
+  ],
+  "codeGenerators": []
+}
