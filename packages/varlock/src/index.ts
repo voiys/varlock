@@ -15,6 +15,7 @@ import {
   ResolutionError,
   type SerializedEnvGraph,
 } from './env-graph';
+import { generatePluginManifest } from './env-graph/lib/plugins';
 
 export async function load() {
   checkBunVersion();
@@ -75,6 +76,9 @@ export const internal = {
   checkForSchemaErrors,
   checkForConfigErrors,
   initVarlockEnv,
+
+  // builds the manifest a plugin package ships, so shape mode can use it without running it
+  generatePluginManifest,
 };
 
 export { patchGlobalConsole } from './runtime/patch-console';

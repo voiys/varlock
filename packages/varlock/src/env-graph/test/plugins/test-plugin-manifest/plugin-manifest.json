@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 1,
+  "name": "@varlock/test-plugin-manifest",
+  "icon": "mdi:puzzle",
+  "bundledIcons": {
+    "mdi:puzzle": "<svg viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 4h16v16H4z\"/></svg>"
+  },
+  "standardVars": {
+    "initDecorator": "@initManifestTest",
+    "params": {
+      "token": {
+        "key": [
+          "MANIFEST_TEST_TOKEN"
+        ],
+        "dataType": "manifestTestToken"
+      }
+    }
+  },
+  "rootDecorators": [
+    {
+      "name": "initManifestTest",
+      "description": "Initialize the manifest test plugin",
+      "isFunction": true
+    }
+  ],
+  "itemDecorators": [
+    {
+      "name": "manifestTag",
+      "deprecated": "use @sensitive instead",
+      "incompatibleWith": [
+        "public"
+      ]
+    }
+  ],
+  "dataTypes": [
+    {
+      "name": "manifestTestToken",
+      "typeDescription": "Token for the manifest test service",
+      "sensitive": true,
+      "internal": true,
+      "docs": [
+        {
+          "description": "Manifest test docs",
+          "url": "https://example.com/docs"
+        }
+      ]
+    },
+    {
+      "name": "manifestTestPort",
+      "icon": "mdi:ethernet",
+      "coercedType": "int"
+    }
+  ],
+  "resolvers": [
+    {
+      "name": "manifestFetch",
+      "label": "Fetch a value from the manifest test service",
+      "description": "Reads one secret by name",
+      "inferredType": "manifestTestToken",
+      "impliesSensitive": true,
+      "argsSchema": {
+        "type": "array",
+        "arrayMinLength": 1,
+        "arrayMaxLength": 2
+      }
+    }
+  ],
+  "codeGenerators": [
+    {
+      "decoratorName": "generateManifestTestFile",
+      "knownOptions": [
+        "flavor"
+      ]
+    }
+  ]
+}

@@ -39,6 +39,9 @@ import type {
 } from './decorators';
 import { createEnvGraphDataType } from './data-types';
 import type { CodeGeneratorDef } from './type-generation';
+import {
+  applyPluginManifest, createPluginManifest, parsePluginManifest, type PluginManifest,
+} from './plugin-manifest';
 
 import { createDebug, type Debugger } from '../../lib/debug';
 import { getWorkspaceInfo } from '../../lib/workspace-utils';
@@ -226,6 +229,9 @@ export class VarlockPlugin {
   installDecoratorInstances: Array<DecoratorInstance> = [];
 
   type: 'single-file' | 'package';
+
+  /** true when the plugin was described by its manifest (shape mode) and its code never ran */
+  loadedFromManifest = false;
 
   constructor(opts: {
     type: 'single-file' | 'package',
@@ -433,6 +439,25 @@ export class VarlockPlugin {
     return path.join(this.localPath!, pluginExport);
   }
 
+  /**
+   * Absolute path of the manifest a package plugin ships (package.json `exports["./manifest"]`),
+   * or undefined if it ships none. The path must stay inside the package.
+   */
+  get manifestFilePath() {
+    if (this.type !== 'package') return undefined;
+    const manifestExport = this._packageJson?.exports?.['./manifest'];
+    if (manifestExport === undefined) return undefined;
+    if (!_.isString(manifestExport)) {
+      throw new SchemaError(`Plugin ${this.name} has a "./manifest" export that is not a file path`);
+    }
+    const packageDir = path.resolve(this.localPath!);
+    const manifestPath = path.resolve(packageDir, manifestExport);
+    if (!manifestPath.startsWith(packageDir + path.sep)) {
+      throw new SchemaError(`Plugin ${this.name} has a "./manifest" export outside its package: ${manifestExport}`);
+    }
+    return manifestPath;
+  }
+
   async executePluginModule() {
     activatePlugin(this);
 
@@ -523,7 +548,26 @@ async function initPluginFromLocalPath(localPath: string) {
 }
 
 
-async function registerPluginInGraph(graph: EnvGraph, plugin: VarlockPlugin, pluginDecorator: RootDecoratorInstance) {
+/** reads and validates the manifest a package plugin ships, if it ships one */
+async function readPluginManifest(plugin: VarlockPlugin): Promise<PluginManifest | undefined> {
+  const manifestPath = plugin.manifestFilePath;
+  if (!manifestPath) return undefined;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(await fs.readFile(manifestPath, 'utf-8'));
+  } catch (err) {
+    throw new SchemaError(`Plugin manifest ${manifestPath} could not be read: ${(err as Error).message}`);
+  }
+  return parsePluginManifest(raw, plugin.name, manifestPath);
+}
+
+async function registerPluginInGraph(
+  graph: EnvGraph,
+  plugin: VarlockPlugin,
+  pluginDecorator: RootDecoratorInstance,
+  /** when set, the plugin is described by its manifest and its module is never executed */
+  manifest?: PluginManifest,
+) {
   let existingPlugin: VarlockPlugin | undefined;
   for (const possibleMatchingPlugin of graph.plugins) {
     if (plugin.type === 'single-file') {
@@ -560,8 +604,12 @@ async function registerPluginInGraph(graph: EnvGraph, plugin: VarlockPlugin, plu
     plugin._cacheStore = graph._cacheStore;
   }
 
-  // this finally executes the plugin code
-  await plugin.executePluginModule();
+  if (manifest) {
+    applyPluginManifest(plugin, manifest);
+  } else {
+    // this finally executes the plugin code
+    await plugin.executePluginModule();
+  }
 
   // if plugin failed to load, don't try to register its exports
   if (plugin.loadingError) {
@@ -919,14 +967,29 @@ export async function processPluginInstallDecorators(dataSource: EnvGraphDataSou
         }
 
         const plugin = await initPluginFromLocalPath(pluginSrcPath);
+        // shape mode describes a plugin from the manifest it ships instead of running its code
+        const manifest = graph.mode === 'shape' ? await readPluginManifest(plugin) : undefined;
         // might return an existing plugin if matches one in the graph
-        await registerPluginInGraph(graph, plugin, pluginDecorator);
+        await registerPluginInGraph(graph, plugin, pluginDecorator, manifest);
       } catch (err) {
         pluginDecorator._errors.push(err instanceof SchemaError ? err : new SchemaError(err as Error));
         continue;
       }
     }
   }
+}
+
+/**
+ * Runs a package plugin and returns the manifest describing what it registers, for the plugin to
+ * ship as its `./manifest` export. This executes the plugin, so only use it on plugins you trust
+ * (e.g. your own, at build time).
+ */
+export async function generatePluginManifest(pluginPackageDir: string): Promise<PluginManifest> {
+  const plugin = await initPluginFromLocalPath(path.resolve(pluginPackageDir));
+  if (plugin.type !== 'package') throw new Error('Only plugin packages can ship a manifest');
+  await plugin.executePluginModule();
+  if (plugin.loadingError) throw plugin.loadingError;
+  return createPluginManifest(plugin);
 }
 
 export type VarlockPluginCtx = {

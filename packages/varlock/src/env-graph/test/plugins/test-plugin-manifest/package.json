@@ -1,0 +1,11 @@
+{
+  "name": "@varlock/test-plugin-manifest",
+  "private": true,
+  "description": "plugin used in automated tests of plugin manifests",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./plugin": "./plugin.js",
+    "./manifest": "./plugin-manifest.json"
+  }
+}
