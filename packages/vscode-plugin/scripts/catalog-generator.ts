@@ -3,8 +3,9 @@
  * hand-written overlay in src/intellisense-prose.ts. Pure functions only (no file or varlock access),
  * so the logic is unit-testable with fake registries. See generate-catalog.ts for the CLI.
  *
- * - which names exist and whether a decorator is a function come from the registries (an overlay entry that
- *   disagrees about `isFunction` is reported in `isFunctionConflicts`), and so does deprecation unless only the overlay has it
+ * - which names exist, whether a decorator is a function and which decorators are incompatible come from the
+ *   registries (an overlay entry that disagrees about `isFunction` is reported in `isFunctionConflicts`), and so
+ *   does deprecation unless only the overlay has it
  * - summary, documentation and snippets come from the overlay; if a name has no overlay entry, the summary
  *   falls back to the registry description, and then to a generic one (reported in `genericNames`)
  * - overlay entries for names the registries no longer have are dropped (reported in `orphanedOverlay`)
@@ -16,6 +17,8 @@ export type RegistryDecoratorDef = {
   isFunction?: boolean;
   isFunctionOrValue?: boolean;
   deprecated?: boolean | string;
+  /** names of decorators that cannot be used alongside this one (varlock declares a pair on one side or both) */
+  incompatibleWith?: Array<string>;
 };
 
 export type RegistrySnapshot = {
@@ -89,38 +92,32 @@ function buildDecorators(
       ...isFunction && { isFunction: true },
       ...def.isFunctionOrValue && { isFunctionOrValue: true },
       ...deprecated && { deprecated },
+      ...def.incompatibleWith?.length && { incompatibleWith: def.incompatibleWith },
     };
   });
 }
 
-function buildDataTypes(registry: RegistrySnapshot['dataTypes'], overlayList: Array<DataTypeInfo>, report: CatalogReport): Array<DataTypeInfo> {
+/** data types and resolvers, which differ only in their generic summary and default snippet */
+function buildEntries<T extends DataTypeInfo | ResolverInfo>(
+  label: 'dataType' | 'resolver',
+  registry: Record<string, { description?: string }>,
+  overlayList: Array<T>,
+  report: CatalogReport,
+  fallback: (name: string) => { summary: string, insertText: string },
+): Array<T> {
   const overlay = byName(overlayList);
-  return orderedNames(overlayList, Object.keys(registry), 'dataType', report).map((name) => {
+  return orderedNames(overlayList, Object.keys(registry), label, report).map((name) => {
     const entry = overlay.get(name);
     const description = registry[name].description;
-    if (!entry && !description) report.genericNames.push(`dataType:${name}`);
+    if (!entry && !description) report.genericNames.push(`${label}:${name}`);
+    const optionSnippets = entry && 'optionSnippets' in entry ? entry.optionSnippets : undefined;
     return {
       name,
-      summary: entry?.summary ?? description ?? `${name} data type.`,
+      summary: entry?.summary ?? description ?? fallback(name).summary,
       documentation: entry?.documentation ?? '',
-      insertText: entry?.insertText ?? name,
-      ...entry?.optionSnippets && { optionSnippets: entry.optionSnippets },
-    };
-  });
-}
-
-function buildResolvers(registry: RegistrySnapshot['resolvers'], overlayList: Array<ResolverInfo>, report: CatalogReport): Array<ResolverInfo> {
-  const overlay = byName(overlayList);
-  return orderedNames(overlayList, Object.keys(registry), 'resolver', report).map((name) => {
-    const entry = overlay.get(name);
-    const description = registry[name].description;
-    if (!entry && !description) report.genericNames.push(`resolver:${name}`);
-    return {
-      name,
-      summary: entry?.summary ?? description ?? `${name}() resolver.`,
-      documentation: entry?.documentation ?? '',
-      insertText: entry?.insertText ?? `${name}($1)`,
-    };
+      insertText: entry?.insertText ?? fallback(name).insertText,
+      ...optionSnippets && { optionSnippets },
+    } as T;
   });
 }
 
@@ -131,8 +128,12 @@ export function buildCatalog(registries: RegistrySnapshot, overlay: CatalogOverl
   const catalog: CatalogOverlay = {
     ROOT_DECORATORS: buildDecorators('root', registries.rootDecorators, overlay.ROOT_DECORATORS, report),
     ITEM_DECORATORS: buildDecorators('item', registries.itemDecorators, overlay.ITEM_DECORATORS, report),
-    DATA_TYPES: buildDataTypes(registries.dataTypes, overlay.DATA_TYPES, report),
-    RESOLVERS: buildResolvers(registries.resolvers, overlay.RESOLVERS, report),
+    DATA_TYPES: buildEntries('dataType', registries.dataTypes, overlay.DATA_TYPES, report, (name) => ({
+      summary: `${name} data type.`, insertText: name,
+    })),
+    RESOLVERS: buildEntries('resolver', registries.resolvers, overlay.RESOLVERS, report, (name) => ({
+      summary: `${name}() resolver.`, insertText: `${name}($1)`,
+    })),
   };
   const literal = (value: unknown) => JSON.stringify(value, null, 2);
   const source = `/* eslint-disable */

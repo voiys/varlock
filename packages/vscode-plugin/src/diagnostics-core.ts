@@ -3,15 +3,11 @@ import { isIP } from 'node:net';
 import { autoCoerce } from '@env-spec/parser';
 
 import type { LineDocument } from './document-lines';
+import { INCOMPATIBLE_DECORATOR_PAIRS } from './completion-core';
 import { DECORATORS_BY_NAME } from './intellisense-catalog';
 
 const DECORATOR_PATTERN = /@([A-Za-z][\w-]*)(?:\([^)]*\)|=[^\s#]+)?/g;
 const MAX_MATCHES_PATTERN_LENGTH = 200;
-const INCOMPATIBLE_DECORATOR_PAIRS = [
-  ['required', 'optional'],
-  ['sensitive', 'public'],
-  ['dynamic', 'static'],
-] as const;
 
 /**
  * Extract a regex pattern from a `regex("pattern", "flags")` call, a deprecated

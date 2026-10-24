@@ -16,6 +16,8 @@ export type DecoratorInfo = {
   /** accepts `@name(...)` or `@name=value`; the function form can repeat, the value form cannot */
   isFunctionOrValue?: boolean;
   deprecated?: string;
+  /** decorators varlock rejects alongside this one; generated from the registry, not set in this overlay */
+  incompatibleWith?: Array<string>;
 };
 
 export type DataTypeInfo = {

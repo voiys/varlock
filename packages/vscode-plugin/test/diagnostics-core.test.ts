@@ -72,6 +72,14 @@ describe('diagnostics-core', () => {
     );
   });
 
+  it('flags the root decorator pairs varlock rejects together', () => {
+    const messages = (line: string) => createDecoratorDiagnostics(getDecoratorOccurrences(line, 0))
+      .map((diagnostic) => diagnostic.message);
+
+    expect(messages('# @envFlag=APP_ENV @currentEnv=$APP_ENV')).toContain('@envFlag and @currentEnv cannot be used together.');
+    expect(messages('# @redact @redactLogs')).toContain('@redact and @redactLogs cannot be used together.');
+  });
+
   describe('@proxy accepts repeated function calls but only one value form', () => {
     const messages = (...lines: Array<string>) => createDecoratorDiagnostics(
       lines.flatMap((line, index) => getDecoratorOccurrences(line, index)),

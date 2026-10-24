@@ -20,7 +20,10 @@ export const ROOT_DECORATORS: Array<DecoratorInfo> = [
     "scope": "root",
     "summary": "Sets the env var reference used to select environment-specific files.",
     "documentation": "Usually used in `.env.schema`, for example `# @currentEnv=$APP_ENV`.",
-    "insertText": "@currentEnv=$${1:APP_ENV}"
+    "insertText": "@currentEnv=$${1:APP_ENV}",
+    "incompatibleWith": [
+      "envFlag"
+    ]
   },
   {
     "name": "defaultRequired",
@@ -143,7 +146,10 @@ export const ROOT_DECORATORS: Array<DecoratorInfo> = [
     "scope": "root",
     "summary": "Controls whether sensitive values are redacted from logs and output.",
     "documentation": "Boolean or options object (`@redact={console=true, stdout=true}`). Sensitive values are replaced with redacted output in console logs, and with `stdout=true` in everything written to stdout/stderr.",
-    "insertText": "@redact=${1|true,false|}"
+    "insertText": "@redact=${1|true,false|}",
+    "incompatibleWith": [
+      "redactLogs"
+    ]
   },
   {
     "name": "redactLogs",
@@ -151,7 +157,10 @@ export const ROOT_DECORATORS: Array<DecoratorInfo> = [
     "summary": "Deprecated alias of @redact.",
     "documentation": "Deprecated. Use `@redact` instead.",
     "insertText": "@redactLogs=${1|true,false|}",
-    "deprecated": "Use @redact instead."
+    "deprecated": "Use @redact instead.",
+    "incompatibleWith": [
+      "redact"
+    ]
   },
   {
     "name": "preventLeaks",
@@ -243,7 +252,10 @@ export const ITEM_DECORATORS: Array<DecoratorInfo> = [
     "scope": "item",
     "summary": "Marks an item as optional.",
     "documentation": "Equivalent to `@required=false`.",
-    "insertText": "@optional"
+    "insertText": "@optional",
+    "incompatibleWith": [
+      "required"
+    ]
   },
   {
     "name": "sensitive",
@@ -257,7 +269,10 @@ export const ITEM_DECORATORS: Array<DecoratorInfo> = [
     "scope": "item",
     "summary": "Marks an item as not sensitive.",
     "documentation": "Equivalent to `@sensitive=false`.",
-    "insertText": "@public"
+    "insertText": "@public",
+    "incompatibleWith": [
+      "sensitive"
+    ]
   },
   {
     "name": "internal",
@@ -271,14 +286,20 @@ export const ITEM_DECORATORS: Array<DecoratorInfo> = [
     "scope": "item",
     "summary": "Marks an item as dynamic: integrations will not replace it at build time.",
     "documentation": "Use `@dynamic=boot` for a value bound at process start, such as a platform-assigned `PORT`. By default, sensitive items are dynamic.",
-    "insertText": "@dynamic"
+    "insertText": "@dynamic",
+    "incompatibleWith": [
+      "static"
+    ]
   },
   {
     "name": "static",
     "scope": "item",
     "summary": "Marks an item as static: eligible for build-time replacement.",
     "documentation": "Equivalent to `@dynamic=false`.",
-    "insertText": "@static"
+    "insertText": "@static",
+    "incompatibleWith": [
+      "dynamic"
+    ]
   },
   {
     "name": "type",

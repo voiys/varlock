@@ -23,7 +23,7 @@ export function addHoverProvider(_context: ExtensionContext) {
 
         if (hoveredText.startsWith('@')) {
           const decName = hoveredText.substring(1);
-          const dec = findDecoratorInfo(decName, getCommentScope(document, position.line));
+          const dec = findDecoratorInfo(decName, () => getCommentScope(document, position.line));
           if (dec) {
             const mds = new MarkdownString();
             mds.supportThemeIcons = true;

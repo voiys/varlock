@@ -186,17 +186,17 @@ describe('completion-core', () => {
 
 describe('findDecoratorInfo', () => {
   it('prefers the entry for the scope the cursor is in', () => {
-    expect(findDecoratorInfo('proxy', 'header')?.scope).toBe('root');
-    expect(findDecoratorInfo('proxy', 'item')?.scope).toBe('item');
+    expect(findDecoratorInfo('proxy', () => 'header')?.scope).toBe('root');
+    expect(findDecoratorInfo('proxy', () => 'item')?.scope).toBe('item');
   });
 
   it('falls back to the other scope when the name only exists there', () => {
-    expect(findDecoratorInfo('required', 'header')?.scope).toBe('item');
-    expect(findDecoratorInfo('currentEnv', 'item')?.scope).toBe('root');
+    expect(findDecoratorInfo('required', () => 'header')?.scope).toBe('item');
+    expect(findDecoratorInfo('currentEnv', () => 'item')?.scope).toBe('root');
   });
 
   it('returns nothing for unknown names', () => {
-    expect(findDecoratorInfo('notADecorator', 'item')).toBeUndefined();
+    expect(findDecoratorInfo('notADecorator', () => 'item')).toBeUndefined();
   });
 });
 

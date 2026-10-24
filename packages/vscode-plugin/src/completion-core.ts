@@ -10,14 +10,31 @@ type LineDocument = {
 const CONFIG_ITEM_PATTERN = /^\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_.-]*\s*=/;
 const DIVIDER_PATTERN = /^\s*#\s*(?:---+|===+)(?:\s|$)/;
 const DECORATOR_PATTERN = /@([A-Za-z][\w-]*)/g;
-const INCOMPATIBLE_DECORATORS = new Map<string, Set<string>>([
-  ['required', new Set(['optional'])],
-  ['optional', new Set(['required'])],
-  ['sensitive', new Set(['public'])],
-  ['public', new Set(['sensitive'])],
-  ['dynamic', new Set(['static'])],
-  ['static', new Set(['dynamic'])],
-]);
+
+/**
+ * Each pair of decorators varlock rejects together, from the catalog's `incompatibleWith` (varlock
+ * declares a pair on one side or both). Listed once per pair, both pairs and members in catalog order.
+ */
+export const INCOMPATIBLE_DECORATOR_PAIRS: Array<[string, string]> = (() => {
+  const decorators = [...ROOT_DECORATORS, ...ITEM_DECORATORS];
+  const position = new Map(decorators.map((decorator, index) => [decorator.name, index]));
+  const pairs = new Map<string, [string, string]>();
+  for (const decorator of decorators) {
+    for (const other of decorator.incompatibleWith ?? []) {
+      const pair = [decorator.name, other].sort((a, b) => position.get(a)! - position.get(b)!) as [string, string];
+      pairs.set(pair.join(' '), pair);
+    }
+  }
+  return [...pairs.values()];
+})();
+
+const INCOMPATIBLE_DECORATORS = new Map<string, Set<string>>();
+for (const [left, right] of INCOMPATIBLE_DECORATOR_PAIRS) {
+  for (const [name, other] of [[left, right], [right, left]]) {
+    if (!INCOMPATIBLE_DECORATORS.has(name)) INCOMPATIBLE_DECORATORS.set(name, new Set());
+    INCOMPATIBLE_DECORATORS.get(name)!.add(other);
+  }
+}
 
 function stripInlineComment(value: string) {
   let quote: '"' | '\'' | '' = '';
@@ -120,10 +137,13 @@ export function getCommentScope(document: LineDocument, lineNumber: number) {
 /**
  * Looks a decorator up by name, preferring the scope the cursor is in. Some names exist in both
  * scopes with different meanings (`@proxy` is a detached rule in the header and an attached one on an item).
+ * The scope is only asked for in that case, since working it out scans the lines above the cursor.
  */
-export function findDecoratorInfo(name: string, scope: 'header' | 'item'): DecoratorInfo | undefined {
-  const [preferred, other] = scope === 'header' ? [ROOT_DECORATORS, ITEM_DECORATORS] : [ITEM_DECORATORS, ROOT_DECORATORS];
-  return preferred.find((decorator) => decorator.name === name) ?? other.find((decorator) => decorator.name === name);
+export function findDecoratorInfo(name: string, getScope: () => 'header' | 'item'): DecoratorInfo | undefined {
+  const root = ROOT_DECORATORS.find((decorator) => decorator.name === name);
+  const item = ITEM_DECORATORS.find((decorator) => decorator.name === name);
+  if (root && item) return getScope() === 'header' ? root : item;
+  return root ?? item;
 }
 
 export function getExistingDecoratorNames(
