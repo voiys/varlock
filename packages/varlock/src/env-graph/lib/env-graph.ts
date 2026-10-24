@@ -348,23 +348,22 @@ export class EnvGraph {
 
 
   /**
-   * Bumped whenever the source tree changes (a source is added or disabled). The structure getters below
-   * (and ConfigItem.defs) are hit thousands of times per load on large schemas, so once items are processed
-   * they memoize against this version instead of rebuilding the same lists on every access.
+   * True once finishLoad has fully completed. The structure getters below (and ConfigItem.defs) are hit thousands
+   * of times per load on large schemas, so from then on they are memoized. Root decorators still change definitions
+   * until the very end of finishLoad (e.g. @setValuesBulk adds defs and replaces resolvers), and nothing changes the
+   * source tree or item definitions after it, so any later change to them would need to clear these memos.
    */
-  _structureVersion = 0;
-  private _sortedDataSourcesMemo?: { version: number, value: Array<EnvGraphDataSource> };
-  private _sortedDefinitionSourcesMemo?: { version: number, value: Array<DefinitionSourceEntry> };
+  _loadSettled = false;
+  private _sortedDataSourcesMemo?: Array<EnvGraphDataSource>;
+  private _sortedDefinitionSourcesMemo?: Array<DefinitionSourceEntry>;
 
   get sortedDataSources() {
-    if (this.configItemsProcessed && this._sortedDataSourcesMemo?.version === this._structureVersion) {
-      return this._sortedDataSourcesMemo.value;
-    }
+    if (this._sortedDataSourcesMemo) return this._sortedDataSourcesMemo;
     function getSourceAndChildren(s: EnvGraphDataSource): Array<EnvGraphDataSource> {
       return [s, ...s.children ? s.children.flatMap(getSourceAndChildren) : []];
     }
     const value = this.rootDataSource ? getSourceAndChildren(this.rootDataSource) : [];
-    if (this.configItemsProcessed) this._sortedDataSourcesMemo = { version: this._structureVersion, value };
+    if (this._loadSettled) this._sortedDataSourcesMemo = value;
     return value;
   }
 
@@ -380,9 +379,7 @@ export class EnvGraph {
    * the original source's full subtree at the alias's precedence position.
    */
   get sortedDefinitionSources(): Array<DefinitionSourceEntry> {
-    if (this.configItemsProcessed && this._sortedDefinitionSourcesMemo?.version === this._structureVersion) {
-      return this._sortedDefinitionSourcesMemo.value;
-    }
+    if (this._sortedDefinitionSourcesMemo) return this._sortedDefinitionSourcesMemo;
     const result: Array<DefinitionSourceEntry> = [];
 
     for (const source of this.sortedDataSources) {
@@ -397,9 +394,7 @@ export class EnvGraph {
       }
     }
 
-    if (this.configItemsProcessed) {
-      this._sortedDefinitionSourcesMemo = { version: this._structureVersion, value: result };
-    }
+    if (this._loadSettled) this._sortedDefinitionSourcesMemo = result;
     return result;
   }
 
@@ -637,7 +632,6 @@ export class EnvGraph {
   async setRootDataSource(source: EnvGraphDataSource) {
     if (this.rootDataSource) throw new Error('root data source already set');
     this.rootDataSource = source;
-    this._structureVersion++;
     source.graph = this;
     await source.finishInit();
     // Process imports on the root source itself.
@@ -860,6 +854,7 @@ export class EnvGraph {
     await this.getRootDec('injectUndefinedAsEmpty')?.resolve();
     await this.getRootDec('proxyConfig')?.resolve();
     await Promise.all(this.getRootDecFns('proxy').map(async (d) => d.resolve()));
+    this._loadSettled = true;
   }
 
   /**
@@ -935,18 +930,16 @@ export class EnvGraph {
     }
   }
 
-  private _graphAdjacencyListMemo?: { version: number, value: GraphAdjacencyList };
+  private _graphAdjacencyListMemo?: GraphAdjacencyList;
   get graphAdjacencyList() {
-    // item deps are fixed once items are processed, and every caller only reads the result
-    if (this.configItemsProcessed && this._graphAdjacencyListMemo?.version === this._structureVersion) {
-      return this._graphAdjacencyListMemo.value;
-    }
+    // item deps are fixed once loading has settled, and every caller only reads the result
+    if (this._graphAdjacencyListMemo) return this._graphAdjacencyListMemo;
     const adjList: GraphAdjacencyList = {};
     for (const itemKey in this.configSchema) {
       const item = this.configSchema[itemKey];
       adjList[itemKey] = item.dependencyKeys;
     }
-    if (this.configItemsProcessed) this._graphAdjacencyListMemo = { version: this._structureVersion, value: adjList };
+    if (this._loadSettled) this._graphAdjacencyListMemo = adjList;
     return adjList;
   }
 
