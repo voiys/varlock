@@ -71,6 +71,26 @@ Set `auto=false` on any generator to skip it during `load`/`run`, then regenerat
 # @generateTsTypes(path=./env.d.ts, auto=false)
 ```
 
+## Generating without running anything
+
+`varlock codegen` loads your schema the same way `varlock load` does, so shell commands in root decorators (for example `@cache=exec(...)` or `@setValuesBulk(exec(...))`) run. When you generate from a schema you don't fully trust, or you don't want a generation step to touch secret stores, pass `--shape`:
+
+```bash
+varlock codegen --shape
+```
+
+This loads the schema in [shape mode](/guides/shape-mode/). Nothing is executed: no `exec()`, no secret providers, no root decorator `execute()`, no plugin downloads, and no cache. It also skips downloading custom `@icon` images, so an icon that isn't bundled with varlock or a plugin (or already cached on disk) is left out of the generated comments. `process.env` is ignored too, so the output doesn't change with the variables set in your shell.
+
+For most schemas the generated files are identical to a normal `varlock codegen`. They can differ when something in the schema depends on a value that shape mode skips or ignores, such as a generator option set from an env var (`processEnv=if(forEnv(prod), none, strict)`), or an item created at load time by `@setValuesBulk(..., createMissing=true)`. See [what changes](/guides/shape-mode/#what-changes). An installed plugin's code is still imported, so `--shape` is not a sandbox for untrusted plugins.
+
+## Watching for changes
+
+```bash
+varlock codegen --watch
+```
+
+Generates once, then regenerates every time the schema or a file it imports is saved. It implies `--shape`, so it never runs shell commands or reaches a secret store on a save. If the schema doesn't load while you are typing (a parse error, an unknown decorator), the errors are printed, the generated files stay as they were, and the next valid save regenerates them. Press Ctrl+C to stop.
+
 ## Extending with plugins
 
 Code generation is contributed through a registry, and [plugins](/guides/plugins/) can register their own generators using the same mechanism the built-in ones use. A generator is a root decorator name plus a `generate` function that receives the resolved schema and returns file contents:

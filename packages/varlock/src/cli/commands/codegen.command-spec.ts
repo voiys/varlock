@@ -10,6 +10,14 @@ export const commandSpec = define({
       multiple: true,
       description: 'Path to a specific .env file or directory to use as the entry point (can be specified multiple times)',
     },
+    shape: {
+      type: 'boolean',
+      description: 'Load the schema without running exec(), secret providers, root decorators, plugin downloads or network requests, and ignore process.env',
+    },
+    watch: {
+      type: 'boolean',
+      description: 'Regenerate whenever the schema or a file it imports changes (implies --shape)',
+    },
   },
   examples: `
 Generates code from your .env schema files.
@@ -26,8 +34,16 @@ Add a per-language decorator to your schema for each output you want:
 This is useful when you have \`auto=false\` set on a generator decorator to
 disable automatic generation during \`varlock load\` or \`varlock run\`.
 
+By default the schema is loaded like \`varlock load\` does, so shell commands in
+root decorators (for example @cache=exec(...) or @setValuesBulk(exec(...))) run.
+Pass --shape to load it without running anything, which also makes the output
+independent of the env vars set in your shell. --watch implies --shape and keeps
+the last good output while the schema has errors.
+
 Examples:
   varlock codegen                    # Generate using the default schema
   varlock codegen --path .env.prod   # Generate from a specific .env file
+  varlock codegen --shape         # Generate without running exec() or other resolvers
+  varlock codegen --watch            # Regenerate on every change to the schema
 `.trim(),
 });
