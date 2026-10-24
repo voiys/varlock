@@ -136,10 +136,20 @@ describe('calls=', () => {
   });
 
   test('is linear on a long unbalanced file', () => {
-    const src = `${"requireEnv(('A', ".repeat(20_000)}`;
-    const started = performance.now();
-    expect(callKeys(src, names)).toEqual([]);
-    expect(performance.now() - started).toBeLessThan(2000);
+    // compare growth, not wall-clock time, so a busy machine can't fail it: 10x the input must
+    // take far less than the 100x a quadratic scan would (best of 3 to skip warm-up noise)
+    const timeFor = (n: number) => {
+      const src = "requireEnv(('A', ".repeat(n);
+      let best = Infinity;
+      for (let i = 0; i < 3; i++) {
+        const started = performance.now();
+        expect(callKeys(src, names)).toEqual([]);
+        best = Math.min(best, performance.now() - started);
+      }
+      return Math.max(best, 0.5);
+    };
+    const small = timeFor(1_000);
+    expect(timeFor(10_000) / small).toBeLessThan(40);
   });
 });
 
