@@ -601,7 +601,7 @@ describe('audit command', () => {
     });
 
     await expect(commandFn({ values: {} } as any))
-      .rejects.toThrow(/no patterns to apply it to/);
+      .rejects.toThrow(/nothing to look for/);
     expect(scanCodeForEnvVarsMock).not.toHaveBeenCalled();
   });
 
@@ -618,7 +618,7 @@ describe('audit command', () => {
       basePath: '/repo',
     });
 
-    await expect(commandFn({ values: {} } as any)).rejects.toThrow(/@auditExtraPatterns\(\) expects regex patterns/);
+    await expect(commandFn({ values: {} } as any)).rejects.toThrow(/@auditExtraPatterns\(\) expects calls=\[\.\.\.\] or props=\[\.\.\.\]/);
   });
 
   test('accepts quoted slash-delimited strings via the DSL string form', async () => {

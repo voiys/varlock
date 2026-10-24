@@ -63,17 +63,15 @@ function collectStringArgs(input: unknown, out: Array<string>) {
   out.push(trimmed);
 }
 
-function collectPatternArgs(input: unknown, out: Array<RegExp>, stats: { regexStrings: number }) {
+function collectPatternArgs(input: unknown, out: Array<RegExp>) {
   if (Array.isArray(input)) {
-    for (const entry of input) collectPatternArgs(entry, out, stats);
+    for (const entry of input) collectPatternArgs(entry, out);
     return;
   }
-  // `regex('...')` calls already resolve to RegExp instances. Quoted
-  // '/.../flags' strings convert via the same rule the DSL uses everywhere;
-  // anything else (bare words, numbers) is a config error, not a pattern.
-  // Note: a bare unquoted literal only survives parsing when it contains no
-  // spaces, commas or parens, so realistic patterns must be quoted or use
-  // regex('...'); both forms land here, never raw.
+  // Positional args are the deprecated regex form (the decorator itself warns about it).
+  // `regex('...')` calls already resolve to RegExp instances. Quoted '/.../flags' strings
+  // convert via the same rule the DSL uses everywhere; anything else (bare words,
+  // numbers) is a config error, not a pattern.
   if (input instanceof RegExp) {
     out.push(input);
     return;
@@ -81,8 +79,6 @@ function collectPatternArgs(input: unknown, out: Array<RegExp>, stats: { regexSt
   if (typeof input === 'string') {
     const parsed = parseRegexLikeString(input);
     if (parsed) {
-      // deprecated spelling - still honoured, the caller prints one warning for all of them
-      stats.regexStrings++;
       out.push(parsed);
       return;
     }
@@ -91,37 +87,88 @@ function collectPatternArgs(input: unknown, out: Array<RegExp>, stats: { regexSt
   // loaded, and the CLI's top-level handler only formats CliExitError/InvalidEnvError -
   // anything else surfaces as an unhandled stack trace.
   throw new CliExitError(
-    '@auditExtraPatterns() expects regex patterns - regex() calls',
+    '@auditExtraPatterns() expects calls=[...] or props=[...]',
     {
-      details: 'The first capture group of each pattern is the env key.',
-      suggestion: "e.g. # @auditExtraPatterns(regex('config\\.get\\(\\s*\\'([A-Z_]+)\\''))",
+      details: `Found ${JSON.stringify(input)} as a positional arg. The only positional args accepted are (deprecated) regex() patterns.`,
+      suggestion: 'e.g. # @auditExtraPatterns(calls=[requireEnv]) finds requireEnv("KEY"), and props=[envKey] finds envKey: "KEY"',
     },
   );
 }
 
+const AUDIT_EXTRA_OPTIONS = ['calls', 'arg', 'props', 'fileTypes'];
+
+/** a name for calls=/props=: identifier parts, joined by dots for calls (`config.get`) */
+function isCodeName(name: string, allowDots: boolean): boolean {
+  const parts = allowDots ? name.split('.') : [name];
+  return parts.every((part) => part.length > 0 && [...part].every((ch, i) => (
+    ch === '_' || ch === '$'
+    || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+    || (i > 0 && ch >= '0' && ch <= '9')
+  )));
+}
+
+function collectNamesArg(record: Record<string, unknown>, key: 'calls' | 'props'): Array<string> | undefined {
+  if (!(key in record)) return undefined;
+  const names: Array<string> = [];
+  collectStringArgs(record[key], names);
+  if (!names.length) {
+    throw new CliExitError(`@auditExtraPatterns(): ${key}=[...] cannot be empty`);
+  }
+  const allowDots = key === 'calls';
+  const bad = names.find((name) => !isCodeName(name, allowDots));
+  if (bad !== undefined) {
+    throw new CliExitError(`@auditExtraPatterns(): ${key}=[...] has an invalid name "${bad}"`, {
+      suggestion: allowDots
+        ? 'Use the function name as written in code, e.g. calls=[requireEnv] or calls=[config.get].'
+        : 'Use the property name as written in code, e.g. props=[envKey].',
+    });
+  }
+  return names;
+}
+
 /**
- * Read the `fileTypes=[...]` option off one `@auditExtraPatterns(...)` call. Each call
- * is its own scope unit: the file types apply to the patterns in that call only.
+ * Read the options off one `@auditExtraPatterns(...)` call. Each call is its own scope
+ * unit: `fileTypes=[...]` applies to the patterns in that call only.
  */
-function collectFileTypesArg(objArgs: unknown): Array<string> | undefined {
+function collectOptionArgs(objArgs: unknown) {
   const record = (objArgs ?? {}) as Record<string, unknown>;
   for (const key of Object.keys(record)) {
-    if (key !== 'fileTypes') {
+    if (!AUDIT_EXTRA_OPTIONS.includes(key)) {
       throw new CliExitError(`@auditExtraPatterns(): unknown option "${key}"`, {
-        suggestion: 'The only option is fileTypes=[...], a list of file extensions the patterns in this call apply to.',
+        suggestion: 'The options are calls=[...], arg=N, props=[...] and fileTypes=[...].',
       });
     }
   }
-  if (!('fileTypes' in record)) return undefined;
+  const calls = collectNamesArg(record, 'calls');
+  const props = collectNamesArg(record, 'props');
 
-  const fileTypes: Array<string> = [];
-  collectStringArgs(record.fileTypes, fileTypes);
-  if (!fileTypes.length) {
-    throw new CliExitError('@auditExtraPatterns(): fileTypes=[...] cannot be empty', {
-      suggestion: 'List the file types the patterns apply to, e.g. fileTypes=[tf, yaml], or drop the option to match every scanned file.',
-    });
+  let arg: number | undefined;
+  if ('arg' in record) {
+    if (!calls) {
+      throw new CliExitError('@auditExtraPatterns(): arg=N only applies to calls=[...]');
+    }
+    const raw = record.arg;
+    arg = typeof raw === 'string' ? Number(raw) : raw as number;
+    if (typeof arg !== 'number' || !Number.isInteger(arg) || arg < 1) {
+      throw new CliExitError(`@auditExtraPatterns(): arg must be a whole number of 1 or more, got ${JSON.stringify(raw)}`, {
+        suggestion: 'arg counts from 1: arg=2 means the second argument of the call.',
+      });
+    }
   }
-  return fileTypes;
+
+  let fileTypes: Array<string> | undefined;
+  if ('fileTypes' in record) {
+    fileTypes = [];
+    collectStringArgs(record.fileTypes, fileTypes);
+    if (!fileTypes.length) {
+      throw new CliExitError('@auditExtraPatterns(): fileTypes=[...] cannot be empty', {
+        suggestion: 'List the file types the patterns apply to, e.g. fileTypes=[tf, yaml], or drop the option to match every scanned file.',
+      });
+    }
+  }
+  return {
+    calls, arg, props, fileTypes,
+  };
 }
 
 async function getCustomAuditExtraPatterns(envGraph: any): Promise<Array<ExtraScanPattern>> {
@@ -130,23 +177,22 @@ async function getCustomAuditExtraPatterns(envGraph: any): Promise<Array<ExtraSc
     : [];
 
   const scanPatterns: Array<ExtraScanPattern> = [];
-  const stats = { regexStrings: 0 };
   for (const dec of rootDecFns || []) {
     const resolved = await dec.resolve();
-    const fileTypes = collectFileTypesArg(resolved?.obj);
+    const {
+      calls, arg, props, fileTypes,
+    } = collectOptionArgs(resolved?.obj);
     const patterns: Array<RegExp> = [];
-    collectPatternArgs(resolved?.arr, patterns, stats);
-    if (!patterns.length && fileTypes) {
-      throw new CliExitError('@auditExtraPatterns(): fileTypes=[...] given with no patterns to apply it to', {
-        suggestion: 'Add at least one regex() pattern to this call.',
+    collectPatternArgs(resolved?.arr, patterns);
+    if (!patterns.length && !calls && !props) {
+      throw new CliExitError('@auditExtraPatterns(): nothing to look for', {
+        suggestion: 'Add calls=[fnName] to find keys passed to a function, or props=[name] to find keys assigned to a property.',
       });
     }
-    for (const pattern of patterns) scanPatterns.push({ pattern, ...(fileTypes ? { fileTypes } : {}) });
-  }
-  if (stats.regexStrings) {
-    console.warn(ansis.yellow(
-      `⚠️  @auditExtraPatterns(): ${stats.regexStrings} pattern${stats.regexStrings === 1 ? ' is' : 's are'} written as a '/.../' string, which is deprecated - use regex("pattern", "flags") instead`,
-    ));
+    const scope = fileTypes ? { fileTypes } : {};
+    for (const pattern of patterns) scanPatterns.push({ pattern, ...scope });
+    if (calls) scanPatterns.push({ calls, ...arg !== undefined && { arg }, ...scope });
+    if (props) scanPatterns.push({ props, ...scope });
   }
   return scanPatterns;
 }

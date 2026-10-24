@@ -104,4 +104,61 @@ describe('audit @auditExtraPatterns end to end', () => {
     expect(options?.extraPatterns?.[0]?.fileTypes).toEqual(['tf', 'yaml']);
     expect(gracefulExitMock).toHaveBeenCalledWith(0);
   });
+
+  test('documented regex() form gets a deprecation warning naming calls=/props=', async () => {
+    scanCodeForEnvVarsMock.mockResolvedValue({ keys: ['APP_ID'], references: [], scannedFilesCount: 1 });
+
+    await commandFn({ values: { path: tempDir } } as any);
+
+    const printed = consoleErrorSpy.mock.calls.map((args: Array<unknown>) => args.join(' ')).join('\n');
+    expect(printed).toContain('@auditExtraPatterns(): regex patterns are deprecated, use calls=[...] or props=[...] instead');
+    expect(gracefulExitMock).toHaveBeenCalledWith(0);
+  });
+
+  // the three regex forms found in real schemas, rewritten
+  test.each([
+    {
+      decorator: '@auditExtraPatterns(calls=[requireEnv, requireStrongSecret, isFlagEnabled])',
+      expected: { calls: ['requireEnv', 'requireStrongSecret', 'isFlagEnabled'] },
+    },
+    {
+      decorator: '@auditExtraPatterns(props=[credentialName], fileTypes=[ts])',
+      expected: { props: ['credentialName'], fileTypes: ['ts'] },
+    },
+    {
+      decorator: '@auditExtraPatterns(calls=[setting, choice, integer, positiveNumber], arg=2, fileTypes=[ts])',
+      expected: { calls: ['setting', 'choice', 'integer', 'positiveNumber'], arg: 2, fileTypes: ['ts'] },
+    },
+    {
+      decorator: '@auditExtraPatterns(calls=[configService.get], props=[envKey])',
+      expected: [{ calls: ['configService.get'] }, { props: ['envKey'] }],
+    },
+  ])('$decorator reaches the scanner', async ({ decorator, expected }) => {
+    fs.writeFileSync(path.join(tempDir, '.env.schema'), [`# ${decorator}`, '# ---', 'APP_ID=', ''].join('\n'));
+    scanCodeForEnvVarsMock.mockResolvedValue({ keys: ['APP_ID'], references: [], scannedFilesCount: 1 });
+
+    await commandFn({ values: { path: tempDir } } as any);
+
+    const options = scanCodeForEnvVarsMock.mock.calls[0]?.[0] as { extraPatterns?: Array<unknown> } | undefined;
+    expect(options?.extraPatterns).toEqual(Array.isArray(expected) ? expected : [expected]);
+    // no deprecation warning for the new forms
+    const printed = consoleErrorSpy.mock.calls.map((args: Array<unknown>) => args.join(' ')).join('\n');
+    expect(printed).not.toContain('deprecated');
+    expect(gracefulExitMock).toHaveBeenCalledWith(0);
+  });
+
+  test.each([
+    ['@auditExtraPatterns(arg=2)', 'arg=N only applies to calls=[...]'],
+    ['@auditExtraPatterns(calls=[f], arg=0)', 'arg must be a whole number of 1 or more'],
+    ['@auditExtraPatterns(calls=[f], arg=two)', 'arg must be a whole number of 1 or more'],
+    ['@auditExtraPatterns(calls=["not a name"])', 'calls=[...] has an invalid name "not a name"'],
+    ['@auditExtraPatterns(props=[a.b])', 'props=[...] has an invalid name "a.b"'],
+    ['@auditExtraPatterns(calls=[])', 'calls=[...] cannot be empty'],
+    ['@auditExtraPatterns(fileTypes=[ts])', 'nothing to look for'],
+    ['@auditExtraPatterns(call=[f])', 'unknown option "call"'],
+  ])('%s is rejected', async (decorator, message) => {
+    fs.writeFileSync(path.join(tempDir, '.env.schema'), [`# ${decorator}`, '# ---', 'APP_ID=', ''].join('\n'));
+    await expect(commandFn({ values: { path: tempDir } } as any)).rejects.toThrow(message);
+    expect(scanCodeForEnvVarsMock).not.toHaveBeenCalled();
+  });
 });

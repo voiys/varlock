@@ -9,9 +9,10 @@ import { EnvGraphDataSource } from './data-source';
 import type { ConfigItem } from './config-item';
 import {
   StaticValueResolver, ArrayLiteralResolver, ObjectLiteralResolver, type Resolver, convertParsedValueToResolvers,
-  getMalformedFunctionCallError,
+  getMalformedFunctionCallError, isRegexLikeString,
 } from './resolver';
 import { ResolutionError, SchemaError, type VarlockError } from './errors';
+import { auditRegexDeprecationWarning } from './regex-deprecation';
 import type { EnvGraph } from './env-graph';
 import { parseKeyFilterArgs, applyKeyFilter, type KeyFilter } from './key-filter';
 import { parseDuration } from '../../lib/duration';
@@ -821,6 +822,16 @@ export const builtInRootDecorators: Array<RootDecoratorDef<any>> = [
   {
     name: 'auditExtraPatterns',
     isFunction: true,
+    process(argsVal) {
+      // the regex form (regex() calls, '/.../' strings) still works, with a deprecation warning.
+      // The options are checked by `varlock audit`, the only reader of this decorator.
+      const isRegexArg = (arg: Resolver): boolean => {
+        if (arg instanceof ArrayLiteralResolver) return arg.childResolvers.some(isRegexArg);
+        return arg.fnName === 'regex' || (arg.isStatic && isRegexLikeString(arg.staticValue));
+      };
+      const usesRegex = (argsVal.arrArgs ?? []).some(isRegexArg);
+      if (usesRegex) argsVal._errors.push(auditRegexDeprecationWarning());
+    },
   },
   {
     name: 'setValuesBulk',

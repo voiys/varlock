@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { extractCallKeys, extractPropKeys, tokenizeSource } from './code-key-extractor';
 
 export const DEFAULT_IGNORED_DIRS = [
   '.git',
@@ -78,9 +79,25 @@ export interface EnvVarReference {
   syntax: EnvVarSyntax;
 }
 
-/** A custom scan pattern, optionally restricted to certain file extensions. */
+/**
+ * A custom scan pattern, optionally restricted to certain file extensions. Exactly one of
+ * `pattern`, `calls` or `props` says what to look for.
+ */
 export interface ExtraScanPattern {
-  pattern: RegExp;
+  /**
+   * A regex whose first capture group is the env key.
+   * @deprecated use `calls` or `props`
+   */
+  pattern?: RegExp;
+  /**
+   * Function names (optionally dotted, like `config.get`): the key is a string literal
+   * passed to a call of one of them, e.g. `requireEnv("KEY")`.
+   */
+  calls?: Array<string>;
+  /** with `calls`, which argument holds the key (1-based, default 1) */
+  arg?: number;
+  /** Property names: the key is a string literal assigned to one, e.g. `name: "KEY"` or `name = "KEY"`. */
+  props?: Array<string>;
   /**
    * File types this pattern applies to, given as extensions with or without a leading
    * dot and matched case-insensitively (`tf`, `.tf` and `.TF` are the same thing).
@@ -107,12 +124,14 @@ export interface ScanCodeEnvVarsOptions {
   ignoredDirs?: Array<string>;
   /**
    * Project-supplied patterns (e.g. from the `@auditExtraPatterns` root
-   * decorator), run after the built-in patterns. The first capture group is
-   * the env key; patterns without one match nothing. The global flag is
-   * added when missing.
+   * decorator), run after the built-in patterns. A `calls`/`props` pattern finds
+   * keys by structure (see code-key-extractor.ts). For the deprecated regex form
+   * the first capture group is the env key; patterns without one match nothing.
+   * The global flag is added when missing.
    *
-   * Like the built-ins these skip commented-out lines, and a capture that
-   * isn't a bare env-key identifier (`cfg.get('app.db.url')`) still matches.
+   * Like the built-ins these skip commented-out lines. A regex capture that isn't
+   * a bare env-key identifier (`cfg.get('app.db.url')`) still matches; `calls`
+   * and `props` only report identifier-shaped keys.
    *
    * A bare RegExp applies to every file the built-in discovery picks up. Use
    * the {@link ExtraScanPattern} form to scope a pattern to particular file
@@ -387,16 +406,32 @@ function matchExtraPatterns(
   filePath: string,
   content: string,
   extraPatterns: Array<NormalizedExtraPattern>,
+  language: ScannerLanguage | undefined,
   precomputedNewlineIndices?: Array<number>,
 ): Array<EnvVarReference> {
   if (!extraPatterns.length) return [];
   const newlineIndices = precomputedNewlineIndices ?? getNewlineIndices(content);
   const references: Array<EnvVarReference> = [];
-  for (const { regex } of extraPatterns) {
-    for (const match of content.matchAll(regex)) {
-      const key = match[1];
-      if (!key) continue;
-      references.push(buildReference(filePath, content, newlineIndices, match.index ?? 0, key, 'custom'));
+  // tokenized once per file, and only when a calls/props pattern applies
+  let tokens: ReturnType<typeof tokenizeSource> | undefined;
+  const getTokens = () => {
+    tokens ??= tokenizeSource(content, language);
+    return tokens;
+  };
+  for (const { regex, calls, props } of extraPatterns) {
+    if (regex) {
+      for (const match of content.matchAll(regex)) {
+        const key = match[1];
+        if (!key) continue;
+        references.push(buildReference(filePath, content, newlineIndices, match.index ?? 0, key, 'custom'));
+      }
+    }
+    const found = [
+      ...calls ? extractCallKeys(getTokens(), calls.names, calls.arg) : [],
+      ...props ? extractPropKeys(getTokens(), props) : [],
+    ];
+    for (const { key, index } of found) {
+      references.push(buildReference(filePath, content, newlineIndices, index, key, 'custom'));
     }
   }
   return references;
@@ -437,7 +472,7 @@ async function scanFileForEnvVarReferences(
 
   // A widened file has no language: no built-in patterns apply, and with no known
   // comment syntax its raw content is what gets matched.
-  if (!language) return matchExtraPatterns(filePath, rawContent, applicablePatterns);
+  if (!language) return matchExtraPatterns(filePath, rawContent, applicablePatterns, undefined);
 
   // Masking preserves byte offsets, so the raw file's newline positions still give the
   // right line/column for every match.
@@ -479,7 +514,7 @@ async function scanFileForEnvVarReferences(
   // Project-supplied escape-hatch patterns run on every scanned file, whatever its
   // language, over the same comment-masked content.
   if (applicablePatterns.length) {
-    references.push(...matchExtraPatterns(filePath, scanContent, applicablePatterns, newlineIndices));
+    references.push(...matchExtraPatterns(filePath, scanContent, applicablePatterns, language, newlineIndices));
   }
 
   return references;
@@ -512,9 +547,12 @@ async function scanFilesWithLimit<T, R>(
   return results;
 }
 
-/** A custom pattern prepared for matching: global regex + resolved extension scope. */
+/** A custom pattern prepared for matching: what to look for + resolved extension scope. */
 interface NormalizedExtraPattern {
-  regex: RegExp;
+  /** global regex (deprecated regex form) */
+  regex?: RegExp;
+  calls?: { names: Array<string>, arg: number };
+  props?: Array<string>;
   /** `null` means "every file the built-in discovery picks up". */
   extensions: Set<string> | null;
 }
@@ -690,18 +728,23 @@ function normalizeExtraPatterns(
 ): Array<NormalizedExtraPattern> {
   const normalized: Array<NormalizedExtraPattern> = [];
   for (const entry of input ?? []) {
-    const pattern = entry instanceof RegExp ? entry : entry.pattern;
+    const spec: ExtraScanPattern = entry instanceof RegExp ? { pattern: entry } : entry;
     // `matchAll` requires the global flag, and a non-global pattern is what a user
     // writing `/.../ ` naturally produces.
-    const regex = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
+    const pattern = spec.pattern;
+    const regex = pattern && (pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`));
 
-    const rawFileTypes = entry instanceof RegExp ? undefined : entry.fileTypes;
     const extensions = new Set<string>();
-    for (const raw of rawFileTypes ?? []) {
+    for (const raw of spec.fileTypes ?? []) {
       const ext = normalizeExtension(raw);
       if (ext) extensions.add(ext);
     }
-    normalized.push({ regex, extensions: extensions.size ? extensions : null });
+    normalized.push({
+      ...regex && { regex },
+      ...spec.calls?.length && { calls: { names: spec.calls, arg: spec.arg ?? 1 } },
+      ...spec.props?.length && { props: spec.props },
+      extensions: extensions.size ? extensions : null,
+    });
   }
   return normalized;
 }

@@ -206,6 +206,42 @@ describe('scanCodeForEnvVars', () => {
     expect(scoped.keys).toContain('YAML_ONLY_KEY');
   });
 
+  test('calls= and props= patterns find keys by structure, with line and column', async () => {
+    fs.writeFileSync(path.join(tempDir, 'env.ts'), [
+      "const db = requireEnv('DATABASE_URL'); // requireEnv('COMMENTED_OUT')",
+      'const help = "requireEnv(\'IN_STRING\')";',
+      'export const tool = { credentialName: "GITHUB_TOKEN" };',
+      'const port = positiveNumber(env, "PORT");',
+    ].join('\n'));
+    fs.writeFileSync(path.join(tempDir, 'settings.py'), 'DB = require_env("PY_KEY")\n');
+
+    const result = await scanCodeForEnvVars({
+      cwd: tempDir,
+      extraPatterns: [
+        { calls: ['requireEnv', 'require_env'] },
+        { props: ['credentialName'], fileTypes: ['ts'] },
+        { calls: ['positiveNumber'], arg: 2, fileTypes: ['ts'] },
+      ],
+    });
+
+    expect(result.keys).toEqual(['DATABASE_URL', 'GITHUB_TOKEN', 'PORT', 'PY_KEY']);
+    expect(result.references.find((r) => r.key === 'DATABASE_URL')).toMatchObject({
+      syntax: 'custom', lineNumber: 1, columnNumber: 12,
+    });
+    expect(result.references.find((r) => r.key === 'GITHUB_TOKEN')).toMatchObject({ lineNumber: 3, columnNumber: 23 });
+  });
+
+  test('calls= scoped with fileTypes pulls in files the built-ins skip', async () => {
+    fs.writeFileSync(path.join(tempDir, 'main.tf'), '# cfg_get("COMMENTED")\nvalue = cfg_get("TF_KEY")\n');
+
+    const result = await scanCodeForEnvVars({
+      cwd: tempDir,
+      extraPatterns: [{ calls: ['cfg_get'], fileTypes: ['tf'] }],
+    });
+
+    expect(result.keys).toEqual(['TF_KEY']);
+  });
+
   test('a scoped pattern does not match files outside its file types', async () => {
     fs.writeFileSync(path.join(tempDir, 'main.tf'), 'value = cfg.get("TF_KEY")\n');
     fs.writeFileSync(path.join(tempDir, 'app.ts'), 'const a = cfg.get("TS_KEY");\n');
