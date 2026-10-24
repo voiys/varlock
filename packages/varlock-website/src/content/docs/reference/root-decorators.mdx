@@ -751,10 +751,19 @@ TypeScript type declarations. Makes `import { ENV } from 'varlock/env'` typed an
 - `importMetaEnv`: how `import.meta.env` is typed: `strict`, `loose`, or `none` (defaults to `strict`; to `none` when `exposeEnv=local`).
 - `icons`: embed each item's [`@icon`](/reference/item-decorators/#icon) (or its data type's icon) in the generated JSDoc (defaults to `true`). Icons for built-in data types and official plugins ship with varlock and those plugins. Custom `@icon` values are fetched from `api.iconify.design` during generation and are left out if the fetch fails, so with custom icons the output can vary with network access. Set `icons=false` when the generated file must be identical on every machine, for example when you commit it and check it for drift in CI.
 
+- `narrowByEnv`: type `ENV` per environment, so checking your [`@currentEnv`](#currentenv) item narrows which items are required (defaults to `false`). With `@required=forEnv(production)`, `ENV.SENTRY_DSN` is `string` inside `if (ENV.APP_ENV === 'production')` and `string | undefined` elsewhere. `@optional=forEnv(...)` works the other way around: with `@optional=forEnv(building)`, `ENV.DATABASE_PASSWORD` is `string` inside `if (ENV.APP_ENV !== 'building')`.
+  - Needs `@currentEnv` set to an item with an `enum` type, included in the generated output.
+  - Only `@required`/`@optional` set to `forEnv()` with plain values (no `$REFS` or nested functions) is narrowed. Everything else is typed as before.
+  - Applies to `ENV` only. `process.env` and `import.meta.env` are not narrowed.
+  - Like the rest of the generated types, it is based on your schema, so `@required`/`@optional` set in env-specific files such as `.env.production` is not taken into account.
+  - With `exposeEnv=global`, only one generated file per project can set it: if several do, only one of them is used for `ENV`. In a monorepo with several schemas, use it with `exposeEnv=local`.
+
 ```env-spec
 # @generateTsTypes(path=./env.d.ts)
 # monorepo-friendly: importable local ENV, no globals
 # @generateTsTypes(path=./env.ts, exposeEnv=local)
+# narrow ENV by environment
+# @generateTsTypes(path=./env.d.ts, narrowByEnv=true)
 ```
 </div>
 
