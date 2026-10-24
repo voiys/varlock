@@ -7,7 +7,9 @@ import {
   ParsedEnvSpecStaticValue,
   type ParsedEnvSpecDecorator,
 } from '@env-spec/parser';
-import type { CoercedType, EnvGraphDataType, EnvGraphDataTypeFactory } from './data-types';
+import {
+  createEnvGraphDataType, type CoercedType, type EnvGraphDataType, type EnvGraphDataTypeFactory,
+} from './data-types';
 import {
   assertUnwrappedRegexSource, convertParsedValueToResolvers, deprecatedRegexStringWarning,
   type Resolver,
@@ -24,6 +26,16 @@ export type TypeSpecContext = {
   dataSource?: EnvGraphDataSource;
   /** advisory findings about the spec (deprecations) - the caller attaches them to the item */
   warnings?: Array<SchemaError>;
+  /**
+   * shape mode: turns a schema-supplied regex into one that runs on the linear-time engine
+   * (see shape-regex.ts)
+   */
+  toRegExp?: (value: RegExp | string) => RegExp;
+  /**
+   * shape mode with runPluginCode: false - plugins that were not loaded. An unknown type name may
+   * come from one of them, so it is a warning and the value is unknown, not an error
+   */
+  pluginsNotLoaded?: Array<string>;
 };
 
 /**
@@ -180,6 +192,29 @@ function optionValue(
   throw new SchemaError(`${context} - option "${kv.key}" must be a static value or resolver call`);
 }
 
+/** an unknown type that may come from a plugin that was not loaded: a sensitive string whose value is unknown */
+function notLoadedPluginTypePlan(ctx: TypeSpecContext, name: string, context?: string): TypeSpecPlan | undefined {
+  if (!ctx.pluginsNotLoaded?.length) return undefined;
+  pushWarningOnce(ctx.warnings, new SchemaError(
+    `${context ? `${context} - ` : ''}unknown data type: ${name} (it may come from ${ctx.pluginsNotLoaded.join(', ')}, which was not loaded)`,
+    { isWarning: true },
+  ));
+  // fail closed: the plugin may mark the type sensitive, so a value of it is never shown
+  const factory = createEnvGraphDataType({ name, sensitive: true, coerceUnavailable: true });
+  return { deferred: [], build: () => factory() };
+}
+
+/** shape mode: every schema regex in the settings runs on the linear-time engine */
+function regexSettingsForShapeLoad(ctx: TypeSpecContext, typeName: string, settings: Record<string, any>) {
+  if (!ctx.toRegExp) return settings;
+  const out: Record<string, any> = {};
+  for (const [key, val] of Object.entries(settings)) {
+    const isRegex = val instanceof RegExp || (readsOptionAsRegex(typeName, key) && typeof val === 'string');
+    out[key] = isRegex ? ctx.toRegExp(val) : val;
+  }
+  return out;
+}
+
 function emptyEnumError(context: string) {
   return new SchemaError(`${context} - enum must have at least one member, e.g. enum(dev, staging, prod)`);
 }
@@ -190,7 +225,11 @@ function buildBareTypePlan(
   name: string,
   context?: string,
 ): TypeSpecPlan {
-  if (!(name in ctx.registry)) throw unknownDataTypeError(name, context);
+  if (!(name in ctx.registry)) {
+    const plan = notLoadedPluginTypePlan(ctx, name, context);
+    if (plan) return plan;
+    throw unknownDataTypeError(name, context);
+  }
   if (name === 'enum') throw emptyEnumError(context ?? '@type=enum');
   return { deferred: [], build: () => ctx.registry[name]() };
 }
@@ -504,7 +543,11 @@ function buildTypeCallPlan(
   context: string,
 ): TypeSpecPlan {
   const name = fnCall.name;
-  if (!(name in ctx.registry)) throw unknownDataTypeError(name, context);
+  if (!(name in ctx.registry)) {
+    const plan = notLoadedPluginTypePlan(ctx, name, context);
+    if (plan) return plan;
+    throw unknownDataTypeError(name, context);
+  }
 
   if (name === 'array') return buildArrayTypePlan(ctx, fnCall, context);
   if (name === 'record') return buildRecordTypePlan(ctx, fnCall, context);
@@ -531,7 +574,7 @@ function buildTypeCallPlan(
           pushWarningOnce(ctx.warnings, deprecatedRegexStringWarning(val, `${context} - option "${key}"`));
         }
       }
-      if (Object.keys(materialized).length) return factory(materialized);
+      if (Object.keys(materialized).length) return factory(regexSettingsForShapeLoad(ctx, name, materialized));
       return factory();
     },
   };
@@ -613,6 +656,8 @@ export function buildTypeSpecPlan(
     if (decoratorValue.name in ctx.resolverFns) {
       return buildDynamicTypePlan(ctx, decoratorValue);
     }
+    const plan = notLoadedPluginTypePlan(ctx, decoratorValue.name);
+    if (plan) return plan;
     throw unknownDataTypeError(decoratorValue.name);
   }
   throw new SchemaError('@type must be set to a type name (e.g. @type=number) or a type call (e.g. @type=enum(a, b))');

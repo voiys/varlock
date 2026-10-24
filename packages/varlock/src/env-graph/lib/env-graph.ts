@@ -46,6 +46,7 @@ import { parseDuration } from '../../lib/duration';
 import { hashEnvSourceContents } from '../../lib/env-source-fingerprint';
 import { MIN_SENSITIVE_VALUE_LENGTH, SHORT_SENSITIVE_VALUE_LENGTH, collectLeaves } from '../../lib/sensitive-value';
 import { markItemResolutionStarted, markItemResolutionFinished } from './pending-resolutions';
+import { loadShapeRegexEngine } from './shape-regex';
 
 /**
  * Credential options written as `$ITEM`, mapped to the referenced item name.
@@ -231,12 +232,29 @@ export class EnvGraph {
    * is recorded in `shapeSkipped`.
    */
   readonly mode: 'default' | 'shape' = 'default';
+  /**
+   * Shape mode only. `false` never runs plugin code: a plugin that ships a manifest is read from it,
+   * and a plugin without one is not loaded at all (a warning on its `@plugin` line, and its decorators,
+   * functions and types are unknown). `true` (the default) runs a plugin that has no manifest.
+   */
+  readonly runPluginCode: boolean = true;
+  /** @internal names of the plugins that were not loaded because they ship no manifest (`runPluginCode: false`) */
+  _pluginsNotLoaded: Array<string> = [];
   shapeSkipped: Array<{
-    kind: 'resolver' | 'rootDecoratorExecute' | 'cacheStore' | 'pluginDownload' | 'codegenWrite' | 'coerce',
+    kind: 'resolver' | 'rootDecoratorExecute' | 'cacheStore' | 'pluginDownload' | 'codegenWrite' | 'coerce'
+      | 'pluginCode' | 'regex',
     name: string,
     /** the item being resolved when a resolver or coercion was skipped, when known */
     itemKey?: string,
   }> = [];
+
+  /** @internal records a skip once (the same regex can be tested many times) */
+  recordShapeSkip(entry: EnvGraph['shapeSkipped'][number]) {
+    const seen = this.shapeSkipped.some((e) => (
+      e.kind === entry.kind && e.name === entry.name && e.itemKey === entry.itemKey
+    ));
+    if (!seen) this.shapeSkipped.push(entry);
+  }
 
   /** root data source (.env.schema) */
   rootDataSource?: EnvGraphDataSource;
@@ -484,8 +502,12 @@ export class EnvGraph {
     this.codeGeneratorsRegistry[name] = generatorDef;
   }
 
-  constructor(opts?: { mode?: 'default' | 'shape' }) {
+  constructor(opts?: { mode?: 'default' | 'shape', runPluginCode?: boolean }) {
     if (opts?.mode) this.mode = opts.mode;
+    if (opts?.runPluginCode === false) {
+      if (this.mode !== 'shape') throw new Error('runPluginCode: false is only supported in shape mode');
+      this.runPluginCode = false;
+    }
     // register base data types (string, number, boolean, etc)
     for (const dataType of BaseDataTypes) {
       this.registerDataType(dataType);
@@ -616,6 +638,8 @@ export class EnvGraph {
 
   async setRootDataSource(source: EnvGraphDataSource) {
     if (this.rootDataSource) throw new Error('root data source already set');
+    // shape mode runs schema-supplied regexes on a linear-time engine (see shape-regex.ts)
+    if (this.mode === 'shape') await loadShapeRegexEngine();
     this.rootDataSource = source;
     source.graph = this;
     await source.finishInit();

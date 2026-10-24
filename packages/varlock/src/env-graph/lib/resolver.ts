@@ -25,6 +25,7 @@ import { DecoratorInstance } from './decorators';
 import { getErrorLocation } from './error-location';
 import { isBuiltinVar } from './builtin-vars';
 import { REGEX_LIKE_STRING, parseRegexLikeString } from './regex-like-string';
+import { ShapeRegExp, toShapeRegExp } from './shape-regex';
 
 const execAsync = promisify(exec);
 
@@ -124,6 +125,27 @@ export class Resolver {
    * gets the same deprecation warning a static one gets at process time. Static ones are
    * skipped here since they were already warned about; repeat resolves never stack it.
    */
+  /**
+   * shape mode: a schema regex runs on the linear-time engine (see shape-regex.ts). Returns the regex to
+   * use, and an unknown match is recorded in `shapeSkipped`
+   */
+  protected schemaRegExp(value: RegExp | string): RegExp | null {
+    const graph = this.envGraph ?? this.dataSource?.graph;
+    if (graph?.mode !== 'shape') return value instanceof RegExp ? value : parseRegexLikeString(value);
+    if (typeof value === 'string' && !REGEX_LIKE_STRING.test(value)) return null;
+    return toShapeRegExp(value, () => graph.recordShapeSkip({ kind: 'regex', name: String(value) }));
+  }
+
+  /** shape mode: whether testing `regex` against `input` has an unknown result (recorded, and marks this result unknown) */
+  protected regexMatchUnknown(regex: RegExp, input: string): boolean {
+    if (!(regex instanceof ShapeRegExp)) return false;
+    const reason = regex.unknownReasonFor(input);
+    if (reason === undefined) return false;
+    regex.onUnknown?.(reason);
+    this._unknownInShapeLoad = true;
+    return true;
+  }
+
   protected warnDynamicRegexString(source: Resolver, str: string) {
     // eslint-disable-next-line no-use-before-define
     if (source instanceof StaticValueResolver) return;
@@ -623,6 +645,13 @@ export const RegexResolver: typeof Resolver = createResolver({
       flags = flagsVal;
     }
     try {
+      const graph = this.envGraph ?? this.dataSource?.graph;
+      // shape mode: a schema regex runs on the linear-time engine (see shape-regex.ts)
+      if (graph?.mode === 'shape') {
+        return new ShapeRegExp(regexStr, flags, {
+          onUnknown: () => graph.recordShapeSkip({ kind: 'regex', name: `regex(${JSON.stringify(regexStr)})` }),
+        });
+      }
       return new RegExp(regexStr, flags);
     } catch (err) {
       throw new SchemaError((err as Error).message);
@@ -683,13 +712,15 @@ export const RemapResolver: typeof Resolver = createResolver({
         const matchVal = await matchValResolver.resolve();
         // support regex-like unquoted strings (e.g., /pattern/flags) and regex() fn
         if (matchVal instanceof RegExp) {
+          if (originalValue !== undefined && this.regexMatchUnknown(matchVal, String(originalValue))) return undefined;
           if (originalValue !== undefined && matchVal.test(String(originalValue))) return remappedVal;
           continue;
         }
         if (typeof matchVal === 'string') {
-          const regex = parseRegexLikeString(matchVal);
+          const regex = this.schemaRegExp(matchVal);
           if (regex) {
             this.warnDynamicRegexString(matchValResolver, matchVal);
+            if (originalValue !== undefined && this.regexMatchUnknown(regex, String(originalValue))) return undefined;
             if (originalValue !== undefined && regex.test(String(originalValue))) return remappedVal;
             continue;
           }
@@ -706,13 +737,15 @@ export const RemapResolver: typeof Resolver = createResolver({
       const matchVal = await remainingArgs[i].resolve();
       // support regex-like unquoted strings (e.g., /pattern/flags) and regex() fn
       if (matchVal instanceof RegExp) {
+        if (originalValue !== undefined && this.regexMatchUnknown(matchVal, String(originalValue))) return undefined;
         if (originalValue !== undefined && matchVal.test(String(originalValue))) return remainingArgs[i + 1].resolve();
         continue;
       }
       if (typeof matchVal === 'string') {
-        const regex = parseRegexLikeString(matchVal);
+        const regex = this.schemaRegExp(matchVal);
         if (regex) {
           this.warnDynamicRegexString(remainingArgs[i], matchVal);
+          if (originalValue !== undefined && this.regexMatchUnknown(regex, String(originalValue))) return undefined;
           if (originalValue !== undefined && regex.test(String(originalValue))) return remainingArgs[i + 1].resolve();
           continue;
         }
@@ -1508,6 +1541,18 @@ export function convertParsedValueToResolvers(
     if (value instanceof ParsedEnvSpecFunctionCall) {
       // we look up the resolver by function name
       ResolverFnClass = registeredResolvers[value.name];
+      const notLoaded = dataSource?.graph?._pluginsNotLoaded ?? [];
+      if (!ResolverFnClass && notLoaded.length) {
+        // shape mode with runPluginCode: false - the function may come from a plugin that was not loaded,
+        // so its result is unknown (never pure, so it is skipped and recorded when resolved). Fail closed: it may
+        // return a secret, so its value counts as sensitive
+        ResolverFnClass = createResolver({
+          name: value.name,
+          impliesSensitive: true,
+          argsSchema: { type: 'mixed' },
+          resolve() { throw new Error('unreachable: a function from a plugin that was not loaded'); },
+        }) as ResolverChildClass;
+      }
       if (!ResolverFnClass) {
         return new ErrorResolver(new SchemaError(`Unknown resolver function: ${value.name}()`));
       }

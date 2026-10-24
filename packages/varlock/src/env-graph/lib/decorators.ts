@@ -109,6 +109,11 @@ export abstract class DecoratorInstance {
             throw new SchemaError(`@${this.name} is a root decorator and cannot be attached to a config item - it must be in the file header (before the first config item)`);
           }
         }
+        const notLoaded = this.graph._pluginsNotLoaded;
+        if (notLoaded.length) {
+          // shape mode with runPluginCode: false - it may come from a plugin that was not loaded
+          throw new SchemaError(`Unknown decorator: @${this.name} (it may come from ${notLoaded.join(', ')}, which was not loaded)`, { isWarning: true });
+        }
         throw new SchemaError(`Unknown decorator: @${this.name}`);
       }
 

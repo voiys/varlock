@@ -596,6 +596,19 @@ async function registerPluginInGraph(
 
   // shape mode describes a plugin from the manifest it ships instead of running its code
   const manifest = graph.mode === 'shape' ? await readPluginManifest(plugin) : undefined;
+  if (graph.mode === 'shape' && !graph.runPluginCode && !manifest) {
+    // never run plugin code: a plugin without a manifest is not loaded, and what it would register is unknown
+    graph._pluginsNotLoaded.push(plugin.name);
+    graph.recordShapeSkip({ kind: 'pluginCode', name: plugin.name });
+    pluginDecorator._errors.push(new SchemaError(
+      `Plugin ${plugin.name} was not loaded: it ships no manifest, and shape mode is set to never run plugin code`,
+      {
+        isWarning: true,
+        tip: 'Its decorators, functions and data types are unknown here. A plugin package can ship a manifest (see the shape mode guide).',
+      },
+    ));
+    return;
+  }
 
   plugin.installDecoratorInstances.push(pluginDecorator);
   graph.plugins.push(plugin);

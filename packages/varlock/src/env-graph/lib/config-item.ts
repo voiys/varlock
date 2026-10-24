@@ -23,6 +23,7 @@ import {
 } from './resolver';
 import { buildTypeSpecPlan, coercedTypesMatch, type TypeSpecPlan } from './type-decorator';
 import { ItemDecoratorInstance } from './decorators';
+import { toShapeRegExp } from './shape-regex';
 
 export type ConfigItemDef = {
   description?: string;
@@ -398,6 +399,12 @@ export class ConfigItem {
           resolverFns: this.envGraph.registeredResolverFunctions,
           dataSource: typeDec!.dataSource,
           warnings: this._typeSpecWarnings,
+          ...this.envGraph.mode === 'shape' && {
+            toRegExp: (value: RegExp | string) => toShapeRegExp(value, () => {
+              this.envGraph.recordShapeSkip({ kind: 'regex', name: String(value), itemKey: this.key });
+            }),
+            pluginsNotLoaded: this.envGraph._pluginsNotLoaded,
+          },
         }, typeDecParsedValue);
         // dynamic parts (option values / whole type) go through the normal resolver
         // lifecycle - process now (validates args, registers deps), resolve during item
