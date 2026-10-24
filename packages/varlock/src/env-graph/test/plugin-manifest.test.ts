@@ -9,11 +9,11 @@ import {
   EnvGraph, DotEnvFileDataSource, collectTypeGenItems, generateTsTypesSrc, resolveFieldTypes,
 } from '../index';
 import { generatePluginManifest } from '../lib/plugins';
+import {
+  FIXTURE_DIR, copyFixtureTo, pluginRuns, type FixtureEdit,
+} from './helpers/manifest-fixture';
 
-// The fixture plugin counts its own module executions in this global, so every test can check
-// whether its code ran. Each "it did not run" assertion has a control where it does run.
-const FIXTURE_DIR = path.join(__dirname, 'plugins/test-plugin-manifest');
-const pluginRuns = () => (globalThis as any).__varlockManifestTestPluginRuns ?? 0;
+// Each "the plugin did not run" assertion has a control where it does run.
 
 const schemaFor = (pluginDir: string, items = '') => outdent`
   # @plugin(${pluginDir}/)
@@ -85,22 +85,8 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-/** a copy of the fixture plugin, with its package.json and manifest edited */
-function copyFixture(edit: { packageJson?: (pkg: any) => void, manifest?: string | ((m: any) => void) } = {}) {
-  const dir = path.join(tmpDir, 'plugin');
-  fs.cpSync(FIXTURE_DIR, dir, { recursive: true });
-  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf-8'));
-  edit.packageJson?.(pkg);
-  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(pkg));
-  if (typeof edit.manifest === 'string') {
-    fs.writeFileSync(path.join(dir, 'plugin-manifest.json'), edit.manifest);
-  } else if (edit.manifest) {
-    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'plugin-manifest.json'), 'utf-8'));
-    edit.manifest(manifest);
-    fs.writeFileSync(path.join(dir, 'plugin-manifest.json'), JSON.stringify(manifest));
-  }
-  return dir;
-}
+/** a copy of the fixture plugin in this test's temp dir, with its package.json and manifest edited */
+const copyFixture = (edit?: FixtureEdit) => copyFixtureTo(path.join(tmpDir, 'plugin'), edit);
 
 describe('plugin manifests', () => {
   test('shape mode registers a plugin from its manifest and never runs its code', async () => {

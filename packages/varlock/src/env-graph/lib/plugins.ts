@@ -596,7 +596,7 @@ async function registerPluginInGraph(
 
   // shape mode describes a plugin from the manifest it ships instead of running its code
   const manifest = graph.mode === 'shape' ? await readPluginManifest(plugin) : undefined;
-  if (graph.mode === 'shape' && !graph.runPluginCode && !manifest) {
+  if (!graph.runPluginCode && !manifest) {
     // never run plugin code: a plugin without a manifest is not loaded, and what it would register is unknown
     graph._pluginsNotLoaded.push(plugin.name);
     graph.recordShapeSkip({ kind: 'pluginCode', name: plugin.name });

@@ -403,7 +403,6 @@ export class ConfigItem {
             toRegExp: (value: RegExp | string) => toShapeRegExp(value, () => {
               this.envGraph.recordShapeSkip({ kind: 'regex', name: String(value), itemKey: this.key });
             }),
-            pluginsNotLoaded: this.envGraph._pluginsNotLoaded,
           },
         }, typeDecParsedValue);
         // dynamic parts (option values / whole type) go through the normal resolver

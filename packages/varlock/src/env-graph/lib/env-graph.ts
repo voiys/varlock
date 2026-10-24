@@ -240,6 +240,8 @@ export class EnvGraph {
   readonly runPluginCode: boolean = true;
   /** @internal names of the plugins that were not loaded because they ship no manifest (`runPluginCode: false`) */
   _pluginsNotLoaded: Array<string> = [];
+  /** @internal the stand-in resolver for each unknown function that may come from a plugin that was not loaded */
+  _notLoadedPluginResolvers = new Map<string, ResolverChildClass>();
   shapeSkipped: Array<{
     kind: 'resolver' | 'rootDecoratorExecute' | 'cacheStore' | 'pluginDownload' | 'codegenWrite' | 'coerce'
       | 'pluginCode' | 'regex',
@@ -248,12 +250,14 @@ export class EnvGraph {
     itemKey?: string,
   }> = [];
 
+  /** keys of the skips recorded by `recordShapeSkip` */
+  private _recordedShapeSkips = new Set<string>();
   /** @internal records a skip once (the same regex can be tested many times) */
   recordShapeSkip(entry: EnvGraph['shapeSkipped'][number]) {
-    const seen = this.shapeSkipped.some((e) => (
-      e.kind === entry.kind && e.name === entry.name && e.itemKey === entry.itemKey
-    ));
-    if (!seen) this.shapeSkipped.push(entry);
+    const key = `${entry.kind}\0${entry.name}\0${entry.itemKey ?? ''}`;
+    if (this._recordedShapeSkips.has(key)) return;
+    this._recordedShapeSkips.add(key);
+    this.shapeSkipped.push(entry);
   }
 
   /** root data source (.env.schema) */

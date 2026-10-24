@@ -31,11 +31,6 @@ export type TypeSpecContext = {
    * (see shape-regex.ts)
    */
   toRegExp?: (value: RegExp | string) => RegExp;
-  /**
-   * shape mode with runPluginCode: false - plugins that were not loaded. An unknown type name may
-   * come from one of them, so it is a warning and the value is unknown, not an error
-   */
-  pluginsNotLoaded?: Array<string>;
 };
 
 /**
@@ -192,11 +187,15 @@ function optionValue(
   throw new SchemaError(`${context} - option "${kv.key}" must be a static value or resolver call`);
 }
 
-/** an unknown type that may come from a plugin that was not loaded: a sensitive string whose value is unknown */
+/**
+ * an unknown type that may come from a plugin that was not loaded (shape mode with runPluginCode: false):
+ * a warning rather than an error, and a sensitive string whose value is unknown
+ */
 function notLoadedPluginTypePlan(ctx: TypeSpecContext, name: string, context?: string): TypeSpecPlan | undefined {
-  if (!ctx.pluginsNotLoaded?.length) return undefined;
+  const pluginsNotLoaded = ctx.dataSource?.graph?._pluginsNotLoaded;
+  if (!pluginsNotLoaded?.length) return undefined;
   pushWarningOnce(ctx.warnings, new SchemaError(
-    `${context ? `${context} - ` : ''}unknown data type: ${name} (it may come from ${ctx.pluginsNotLoaded.join(', ')}, which was not loaded)`,
+    `${context ? `${context} - ` : ''}unknown data type: ${name} (it may come from ${pluginsNotLoaded.join(', ')}, which was not loaded)`,
     { isWarning: true },
   ));
   // fail closed: the plugin may mark the type sensitive, so a value of it is never shown

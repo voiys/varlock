@@ -8,11 +8,9 @@ import outdent from 'outdent';
 import {
   EnvGraph, DotEnvFileDataSource, collectTypeGenItems, generateTsTypesSrc, resolveFieldTypes,
 } from '../index';
+import { FIXTURE_DIR, copyFixtureTo, pluginRuns } from './helpers/manifest-fixture';
 
-// The fixture plugin counts its own module executions in this global. Every "it did not run" assertion
-// has a control where the same schema does run it.
-const FIXTURE_DIR = path.join(__dirname, 'plugins/test-plugin-manifest');
-const pluginRuns = () => (globalThis as any).__varlockManifestTestPluginRuns ?? 0;
+// Every "the plugin did not run" assertion has a control where the same schema does run it.
 
 type GraphOpts = ConstructorParameters<typeof EnvGraph>[0];
 
@@ -31,12 +29,9 @@ describe('shape mode with runPluginCode: false', () => {
   // the fixture plugin without its manifest export: a plugin that ships no manifest
   let noManifestDir: string;
   beforeAll(() => {
-    noManifestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'varlock-no-manifest-'));
-    fs.cpSync(FIXTURE_DIR, noManifestDir, { recursive: true });
-    const pkgPath = path.join(noManifestDir, 'package.json');
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-    delete pkg.exports['./manifest'];
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg));
+    noManifestDir = copyFixtureTo(fs.mkdtempSync(path.join(os.tmpdir(), 'varlock-no-manifest-')), {
+      packageJson: (pkg) => delete pkg.exports['./manifest'],
+    });
   });
   afterAll(() => fs.rmSync(noManifestDir, { recursive: true, force: true }));
 

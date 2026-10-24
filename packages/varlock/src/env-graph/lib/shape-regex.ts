@@ -12,6 +12,7 @@
  * Default mode never uses this.
  */
 import type { RE2JS as RE2JSClass } from 're2js';
+import { REGEX_LIKE_STRING } from './regex-like-string';
 
 let RE2JS: typeof RE2JSClass | undefined;
 
@@ -124,6 +125,31 @@ function translate(source: string, flags: string): string {
 
 const SURROGATE = /[\uD800-\uDFFF]/;
 
+/**
+ * Compiled RE2 programs (or why a pattern cannot be compiled), by flags and source. A program is
+ * immutable and each match makes its own matcher, so one program serves every regex with that pattern.
+ */
+const compiledPrograms = new Map<string, { re2?: RE2JSClass, untranslatable?: string }>();
+const MAX_COMPILED_PROGRAMS = 1000;
+function compileProgram(source: string, flags: string) {
+  const key = `${flags}/${source}`;
+  let compiled = compiledPrograms.get(key);
+  if (!compiled) {
+    try {
+      // eslint-disable-next-line no-bitwise
+      const re2Flags = (flags.includes('i') ? RE2JS!.CASE_INSENSITIVE : 0)
+        | (flags.includes('m') ? RE2JS!.MULTILINE : 0);
+      compiled = { re2: RE2JS!.compile(translate(source, flags), re2Flags) };
+    } catch (err) {
+      compiled = { untranslatable: (err as Error).message };
+    }
+    // schemas are re-read for as long as the process runs: keep the cache from growing without bound
+    if (compiledPrograms.size >= MAX_COMPILED_PROGRAMS) compiledPrograms.clear();
+    compiledPrograms.set(key, compiled);
+  }
+  return compiled;
+}
+
 /** A RegExp that runs on RE2 (linear time). See the module comment. */
 export class ShapeRegExp extends RegExp {
   private _re2?: RE2JSClass;
@@ -137,14 +163,10 @@ export class ShapeRegExp extends RegExp {
     super(source, flags); // JS syntax errors surface exactly as in default mode
     this._display = opts?.display;
     this.onUnknown = opts?.onUnknown;
-    try {
-      if (!RE2JS) throw new Untranslatable('the regex engine is not loaded');
-      // eslint-disable-next-line no-bitwise
-      const re2Flags = (this.flags.includes('i') ? RE2JS.CASE_INSENSITIVE : 0)
-        | (this.flags.includes('m') ? RE2JS.MULTILINE : 0);
-      this._re2 = RE2JS.compile(translate(this.source, this.flags), re2Flags);
-    } catch (err) {
-      this.untranslatable = (err as Error).message;
+    if (!RE2JS) {
+      this.untranslatable = 'the regex engine is not loaded';
+    } else {
+      ({ re2: this._re2, untranslatable: this.untranslatable } = compileProgram(this.source, this.flags));
     }
   }
 
@@ -152,6 +174,24 @@ export class ShapeRegExp extends RegExp {
   unknownReasonFor(input: string): string | undefined {
     if (this.untranslatable) return this.untranslatable;
     if (!this.unicode && SURROGATE.test(input)) return 'astral characters without the u flag';
+  }
+
+  /**
+   * Like `test()`, but undefined when the match is unknown (and then `onUnknown` is called), so a
+   * caller can tell an unknown match from a real one
+   */
+  testKnown(input: string): boolean | undefined {
+    const reason = this.unknownReasonFor(input);
+    if (reason !== undefined) {
+      this.onUnknown?.(reason);
+      return undefined;
+    }
+    return this.find(input) !== null;
+  }
+
+  test(input: string): boolean {
+    // unknown: report a match, so nothing is reported as invalid
+    return this.testKnown(String(input)) ?? true;
   }
 
   exec(input: string): RegExpExecArray | null {
@@ -165,6 +205,18 @@ export class ShapeRegExp extends RegExp {
       fake.input = str;
       return fake;
     }
+    const m = this.find(str);
+    if (!m) return null;
+    const groups: Array<string | undefined> = [];
+    for (let g = 0; g <= m.groupCount(); g++) groups.push(m.group(g) ?? undefined);
+    const result = groups as unknown as RegExpExecArray;
+    result.index = m.start();
+    result.input = str;
+    return result;
+  }
+
+  /** runs RE2 on an input known to be readable, updating `lastIndex` as exec() does. The matcher, or null */
+  private find(str: string) {
     const stateful = this.global || this.sticky;
     const start = stateful ? this.lastIndex : 0;
     if (start > str.length) {
@@ -176,13 +228,8 @@ export class ShapeRegExp extends RegExp {
       if (stateful) this.lastIndex = 0;
       return null;
     }
-    const groups: Array<string | undefined> = [];
-    for (let g = 0; g <= m.groupCount(); g++) groups.push(m.group(g) ?? undefined);
-    const result = groups as unknown as RegExpExecArray;
-    result.index = m.start();
-    result.input = str;
     if (stateful) this.lastIndex = m.end();
-    return result;
+    return m;
   }
 
   toString() {
@@ -200,7 +247,7 @@ export function toShapeRegExp(
 ): ShapeRegExp {
   if (value instanceof ShapeRegExp) return value;
   if (value instanceof RegExp) return new ShapeRegExp(value.source, value.flags, { onUnknown });
-  const literal = value.match(/^\/(.+)\/([dgimsuvy]*)$/);
+  const literal = value.match(REGEX_LIKE_STRING);
   if (literal) {
     try {
       return new ShapeRegExp(literal[1], literal[2], { display: value, onUnknown });
