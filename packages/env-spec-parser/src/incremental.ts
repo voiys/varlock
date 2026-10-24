@@ -26,13 +26,19 @@ type PegLibraryResult = {
   peg$currPos: number;
   peg$FAILED: any;
   peg$maxFailPos: number;
+  peg$maxFailExpected: Array<any>;
 };
 
 /** parse one top-level node of `text` at `pos`; positions in the result are relative to `text` */
 function parseNodeAt(text: string, pos: number) {
   const r: PegLibraryResult = peggyParser.parse(text, { startRule: 'EnvSpecNode', peg$library: true, peg$currPos: pos });
-  if (r.peg$result === r.peg$FAILED) return undefined;
-  return { node: r.peg$result, end: r.peg$currPos, maxFailPos: r.peg$maxFailPos };
+  return {
+    failed: r.peg$result === r.peg$FAILED,
+    node: r.peg$result,
+    end: r.peg$currPos,
+    maxFailPos: r.peg$maxFailPos,
+    maxFailExpected: r.peg$maxFailExpected,
+  };
 }
 
 /** length of the common prefix of a and b, compared in chunks (string equality is a memcmp) */
@@ -95,6 +101,18 @@ export function shiftNodeLocations(root: any, dOffset: number, dLine: number) {
   walk(root);
 }
 
+/** the error a whole-file parse throws for a failure at `at` (absolute) with these expectations */
+function syntaxErrorAt(text: string, at: number, expected: Array<any>, base: number, baseLine: number) {
+  const found = at < text.length ? text.charAt(at) : null;
+  const pos = (off: number) => {
+    const lineStart = text.lastIndexOf('\n', off - 1) + 1;
+    return { offset: off, line: baseLine + countNewlines(text, base, off), column: off - lineStart + 1 };
+  };
+  const location = { source: undefined, start: pos(at), end: pos(at < text.length ? at + 1 : at) };
+  const SyntaxErrorClass = (peggyParser as any).SyntaxError;
+  return new SyntaxErrorClass(SyntaxErrorClass.buildMessage(expected, found), expected, found, location);
+}
+
 /** move a node parsed from `text.slice(base)` to absolute positions (base is a line start on line `baseLine`) */
 const rebase = (node: any, base: number, baseLine: number) => shiftNodeLocations(node, base, baseLine - 1);
 
@@ -113,7 +131,7 @@ export function reparseEnvSpecIncremental(
   prev: ParsedEnvSpecFile,
   prevText: string,
   nextText: string,
-): IncrementalParseResult | undefined {
+): IncrementalParseResult | { error: Error, nodesParsed: number } | undefined {
   if (prevText.includes('\r') || nextText.includes('\r')) return undefined;
   const nodes = prev.contents as Array<any>;
   if (!nodes.length) return undefined;
@@ -148,7 +166,7 @@ export function reparseEnvSpecIncremental(
     const base = startOf(before);
     const r = parseNodeAt(prevText.slice(base), 0);
     nodesParsed++;
-    if (!r) return undefined;
+    if (r.failed) return undefined;
     // predicates fail silently (not in maxFailPos) but only ever look within the current line
     const probed = base + Math.max(r.maxFailPos, r.end - 1);
     const lineEnd = prevText.indexOf('\n', probed);
@@ -164,6 +182,9 @@ export function reparseEnvSpecIncremental(
   const sub = nextText.slice(ws);
   let pos = 0;
   let k = -1; // old index to resume at
+  // furthest failure over the nodes parsed so far, merged the way one whole-file parse accumulates it
+  let failPos = -1;
+  let failExpected: Array<any> = [];
   while (ws + pos < nextText.length) {
     const abs = ws + pos;
     if (abs >= newChangeEnd) {
@@ -183,7 +204,21 @@ export function reparseEnvSpecIncremental(
     }
     const r = parseNodeAt(sub, pos);
     nodesParsed++;
-    if (!r || r.end === pos) return undefined;
+    if (r.maxFailPos > failPos) {
+      failPos = r.maxFailPos;
+      failExpected = [...r.maxFailExpected];
+    } else if (r.maxFailPos === failPos) {
+      failExpected.push(...r.maxFailExpected);
+    }
+    if (r.failed) {
+      // the whole-file parse stops here too. Its error is the furthest failure of every rule it tried, and the
+      // nodes before this window never probed at or after the edit, so when the failure is at or after the
+      // edit the window alone gives the same error. Otherwise (or when the failure is at this node's start,
+      // where a whole-file parse also expects the end of input) leave it to a full parse
+      if (ws + failPos < p || failPos <= pos) return undefined;
+      return { error: syntaxErrorAt(nextText, ws + failPos, failExpected, ws, wsLine), nodesParsed };
+    }
+    if (r.end === pos) return undefined;
     rebase(r.node, ws, wsLine);
     parsed.push(r.node);
     pos = r.end;
