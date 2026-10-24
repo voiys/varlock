@@ -57,9 +57,9 @@ This loads the schema file and the files it imports. Value files such as `.env.l
 | Code generation | writes wherever `path` points | only inside the directory of the root schema or directory; a path that leaves it (`..`, absolute, or through a symlink) is a schema error |
 | Files | read as usual | a schema or env file that is not a regular file (a named pipe or a device), whether it is the root file, imported directly, or found in an imported directory, is a loading error instead of a read that never returns |
 
-Everything skipped is recorded in `graph.shapeSkipped` as `{ kind, name, itemKey? }`, where `kind` is `resolver`, `rootDecoratorExecute`, `cacheStore`, `pluginDownload`, `codegenWrite`, or `coerce` (see [Plugin manifests](#plugin-manifests)), and `itemKey` is the item whose value was being resolved when a resolver or coercion was skipped. Tools can use it to tell users which values could not be computed.
+Everything skipped is recorded in `graph.shapeSkipped` as `{ kind, name, itemKey? }`, where `kind` is `resolver`, `rootDecoratorExecute`, `cacheStore`, `pluginDownload`, `codegenWrite`, `coerce`, or `validate` (see [Plugin manifests](#plugin-manifests)), and `itemKey` is the item whose value was being resolved when a resolver, coercion, or validation was skipped. Tools can use it to tell users which values could not be computed.
 
-Apart from those differences, a tool sees the same types that [code generation](/guides/code-generation/) produces, and the same requiredness, sensitivity, and validation messages, except where a decorator or function depends on a value that was skipped (see [Pure resolvers](#pure-resolvers)), and except for the checks a plugin read from its [manifest](#plugin-manifests) does in code (its `process()` hooks and data type `validate()`), which don't run and are not listed in `shapeSkipped`. [Builtin variables](/reference/builtin-variables/) such as `VARLOCK_ENV` are computed from an env you pass in explicitly, or from an empty one, so the same schema gives the same result on any machine. Without CI variables in that env, `VARLOCK_BRANCH` is unknown (and listed in `shapeSkipped`), because the local `git branch --show-current` lookup is skipped.
+Apart from those differences, a tool sees the same types that [code generation](/guides/code-generation/) produces, and the same requiredness, sensitivity, and validation messages, except where a decorator or function depends on a value that was skipped (see [Pure resolvers](#pure-resolvers)), and except for the checks a plugin read from its [manifest](#plugin-manifests) does only in code: its `process()` hooks, which don't run and are not listed in `shapeSkipped`, and data type checks its validation rules mark as `custom`, which are listed with `kind: 'validate'`. [Builtin variables](/reference/builtin-variables/) such as `VARLOCK_ENV` are computed from an env you pass in explicitly, or from an empty one, so the same schema gives the same result on any machine. Without CI variables in that env, `VARLOCK_BRANCH` is unknown (and listed in `shapeSkipped`), because the local `git branch --show-current` lookup is skipped.
 
 ### Pure resolvers
 
@@ -98,20 +98,46 @@ If you leave `pure` out, the resolver is skipped in shape mode, which is the saf
 
 ## Plugin manifests
 
-A plugin manifest is a JSON file, shipped in the plugin package, that describes what the plugin registers: its root and item decorators, data types, resolver functions, code generators, icon, bundled icons, and standard vars. In shape mode, varlock reads it instead of importing the plugin, so the graph gets the plugin's decorators, data types, and resolvers without running any plugin code. Default mode ignores it and runs the plugin as usual.
+A plugin manifest is a JSON file, shipped in the plugin package, that describes what the plugin registers: its root and item decorators, data types (with their validation rules), resolver functions, code generators, credential proxy transform schemes, icon, bundled icons, and standard vars. In shape mode, varlock reads it instead of importing the plugin, so the graph gets the plugin's decorators, data types, and resolvers without running any plugin code. Default mode ignores it and runs the plugin as usual.
 
 Item types, sensitivity, and requiredness come out the same as when the plugin runs, except where they depend on the plugin code listed below. That includes a decorator such as `@required=eq($PORT, 8080)` that reads a value which is unknown without that code (see [Pure resolvers](#pure-resolvers)).
 
-The 1Password plugin ships one. Other first-party plugins will follow.
+Every first-party plugin ships one.
 
 A manifest only holds data. Nothing a plugin does in code is carried, so with a manifest, shape mode does not run:
 
 - the plugin's `process()` hooks, so checks such as a duplicate `@initOp` id or an `op()` call naming an unknown instance are not reported, and anything a hook sets (for example a resolver's inferred type set in `process()` rather than on its definition) is missing
-- data type `validate()`, so a check such as "token must start with `ops_`" is not reported
+- data type `validate()`. Its checks are described by the type's [validation rules](#validation-rules) instead, which give the same errors for most first-party types. A check the rules mark as `custom` is not reported, and items that reach it are listed in `graph.shapeSkipped` with `kind: 'validate'` (their value is still known)
 - data type `coerce()`. The value of an item whose type the plugin coerces in code (directly, or as the element of a type such as `array(myType)`) is unknown, like a value from a skipped resolver, and is listed in `graph.shapeSkipped` with `kind: 'coerce'`
 - any resolver, including one marked `pure: true`, so its items are unknown and listed in `graph.shapeSkipped`
+- a proxy transform scheme's `apply()`. Its option specs are carried, so a `@proxy(transform={...})` config is checked the same way. A scheme with its own `validate()` or `placeAttachedItem()` can't be described, and `generatePluginManifest()` reports an error for it
 
-A data type that takes settings, like `myType(max=10)`, is described as it is with no settings, so settings that change its coerced type, sensitivity, or other metadata are not reflected.
+A data type that takes settings, like `myType(max=10)`, is described as it is with no settings, so settings that change its coerced type, sensitivity, validation, or other metadata are not reflected.
+
+### Validation rules
+
+A data type can list the checks its `validate()` makes as `validationRules`. The manifest carries them, and shape mode applies them to values it knows, so an editor or agent gets the same error the plugin would give, with no plugin code running:
+
+```ts
+plugin.registerDataType({
+  name: 'opServiceAccountToken',
+  validationRules: [
+    { startsWith: 'ops_', message: 'Service account tokens must start with ops_' },
+  ],
+  validationSamples: ['ops_eyJzaWduSW5BZGRyZXNzIjoi', 'eyJzaWduSW5BZGRyZXNzIjoi'],
+  async validate(val) {
+    if (!val.startsWith('ops_')) {
+      throw new ValidationError('Service account tokens must start with ops_');
+    }
+  },
+});
+```
+
+Rules are checked in order, and the first one that fails is the error, with its `message` and optional `tip`. Each rule has one check, named like the options of the [`string` type](/reference/data-types/): `startsWith`, `endsWith`, `includes`, `minLength`, `maxLength`, `isLength`, or `matches` (a `/pattern/flags` string, or a bare pattern). A `{ custom: "what it checks", message? }` rule stands for a check that only runs in code. It must be the last rule: a value that passes the rules before it is still unchecked, and is listed in `shapeSkipped`. Rules check the string value, so a type that coerces values in code can only use a `custom` rule.
+
+When `validate()` is set, it is what runs everywhere else, so the rules and the code must agree. `generatePluginManifest()` checks that: it runs `validate()` and the rules on each value in `validationSamples`, plus values it derives from the rules (such as values cut to just around each length), and reports an error if they give a different result, message, or tip, if no value fails some rule, or if no value passes them. A data type that has `validate()` but no `validationRules` is also an error. Include samples that fail several rules at once, so the order of the checks is compared too. `validationSamples` are not carried into the manifest.
+
+A `matches` pattern from a manifest runs on every value of that type, so a pattern prone to catastrophic backtracking can slow a shape load down, the same as a `matches` setting in a schema. Varlock does not guard against that yet.
 
 ### Shipping a manifest
 
@@ -140,4 +166,4 @@ fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
 Run it after each build, or check it in CI, so the manifest never falls behind the plugin. The varlock repo does this for its own plugins with `bun run plugin-manifests` and `bun run plugin-manifests --check`.
 
-Varlock reads the manifest only when its `name` matches the package name, and the `./manifest` path must stay inside the package. A manifest that is missing, unreadable, or invalid is a schema error on the `@plugin` line, and the plugin does not run. A plugin that registers credential proxy transform schemes can't be described by a manifest yet, and `generatePluginManifest()` reports an error for it.
+Varlock reads the manifest only when its `name` matches the package name, and the `./manifest` path must stay inside the package. A manifest that is missing, unreadable, or invalid is a schema error on the `@plugin` line, and the plugin does not run. `generatePluginManifest()` reports an error for anything it can't describe: a proxy transform scheme with code hooks, a data type whose validation rules disagree with its `validate()`, or a field that isn't plain JSON.

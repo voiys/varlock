@@ -232,9 +232,10 @@ export class EnvGraph {
    */
   readonly mode: 'default' | 'shape' = 'default';
   shapeSkipped: Array<{
-    kind: 'resolver' | 'rootDecoratorExecute' | 'cacheStore' | 'pluginDownload' | 'codegenWrite' | 'coerce',
+    kind: 'resolver' | 'rootDecoratorExecute' | 'cacheStore' | 'pluginDownload' | 'codegenWrite' | 'coerce'
+      | 'validate',
     name: string,
-    /** the item being resolved when a resolver or coercion was skipped, when known */
+    /** the item being resolved when a resolver, coercion or validation was skipped, when known */
     itemKey?: string,
   }> = [];
 

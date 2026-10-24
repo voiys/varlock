@@ -33,8 +33,14 @@ plugin.registerDataType({
   sensitive: true,
   internal: true,
   docs: [{ description: 'Manifest test docs', url: 'https://example.com/docs' }],
+  validationRules: [
+    { startsWith: 'mt_', message: 'must start with mt_', tip: 'tokens look like mt_abc123' },
+    { minLength: 6, message: 'too short' },
+  ],
+  validationSamples: ['mt_abc123', 'mt_ab', 'nope'],
   validate(val) {
-    if (!val.startsWith('mt_')) throw new ValidationError('must start with mt_');
+    if (!val.startsWith('mt_')) throw new ValidationError('must start with mt_', { tip: 'tokens look like mt_abc123' });
+    if (val.length < 6) throw new ValidationError('too short');
   },
 });
 
@@ -44,8 +50,27 @@ plugin.registerDataType((settings) => ({
   icon: 'mdi:ethernet',
   coercedType: 'int',
   coerce: (val) => parseInt(val, 10),
+  validationRules: [{ custom: 'at most the max setting' }],
   validate: (val) => (settings?.max === undefined || val <= settings.max),
 }));
+
+// part of its validation can only run in code
+plugin.registerDataType({
+  name: 'manifestTestJson',
+  validationRules: [
+    { startsWith: '{', message: 'must be a JSON object' },
+    { custom: 'parses as JSON', message: 'must be valid JSON' },
+  ],
+  validationSamples: ['{"a":1}', '{nope', '[1]'],
+  validate(val) {
+    if (!val.startsWith('{')) throw new ValidationError('must be a JSON object');
+    try {
+      JSON.parse(val);
+    } catch {
+      throw new ValidationError('must be valid JSON');
+    }
+  },
+});
 
 plugin.registerResolverFunction({
   name: 'manifestFetch',
@@ -66,4 +91,13 @@ plugin.registerCodeGenerator({
   decoratorName: 'generateManifestTestFile',
   knownOptions: ['flavor'],
   generate: () => 'generated',
+});
+
+plugin.registerProxyTransformScheme({
+  scheme: 'manifest-test-sign',
+  options: {
+    keyId: { required: true, type: 'string', itemRole: 'wire' },
+    region: { type: 'enum', enumValues: ['eu', 'us'] },
+  },
+  apply: () => ({ setHeaders: { 'x-signed': 'yes' } }),
 });

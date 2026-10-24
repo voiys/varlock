@@ -1,6 +1,10 @@
 import _ from '@env-spec/utils/my-dash';
 import { SchemaError } from './errors';
 import type { VarlockPlugin } from './plugins';
+import {
+  checkValidationRules, findValidationRulesProblem, validationRuleCheckName, type ValidationRule,
+} from './validation-rules';
+import type { ProxyTransformOptionSpec } from '../../proxy/types';
 
 /**
  * A plugin manifest is a JSON description of what a plugin registers (decorators, data types,
@@ -9,7 +13,9 @@ import type { VarlockPlugin } from './plugins';
  * `generatePluginManifest`) and shipped in the plugin package as its `./manifest` export.
  *
  * It only holds data. Everything a plugin does in code (`process()`, `execute()`, `resolve()`,
- * `coerce()`, `validate()`, `generate()`) is left out, so a manifest never makes anything run.
+ * `coerce()`, `validate()`, `generate()`, a proxy transform's `apply()`) is left out, so a manifest
+ * never makes anything run. A data type's `validate()` is described by its `validationRules`, which
+ * generating the manifest checks against the real `validate()`.
  */
 export const PLUGIN_MANIFEST_VERSION = 1;
 
@@ -26,9 +32,11 @@ export type PluginManifest = {
   dataTypes?: Array<Entry>;
   resolvers?: Array<Entry>;
   codeGenerators?: Array<Entry>;
+  proxyTransformSchemes?: Array<Entry>;
 };
 
-type FieldCheck = (val: unknown) => boolean;
+/** true if the value is fine, false or a description of the problem if not */
+type FieldCheck = (val: unknown) => boolean | string;
 
 const isStringArray: FieldCheck = (val) => Array.isArray(val) && val.every(_.isString);
 /** plain JSON data: survives JSON.stringify/parse unchanged */
@@ -84,6 +92,7 @@ const DATA_TYPE_FIELDS: Record<string, FieldCheck> = {
   internal: _.isBoolean,
   docs: (val) => Array.isArray(val)
     && val.every((d) => _.isString(d) || (_.isPlainObject(d) && _.isString(d.url) && _.isString(d.description))),
+  validationRules: (val) => findValidationRulesProblem(val) ?? true,
   // true when the plugin coerces values in code, which a manifest cannot carry
   coerceUnavailable: _.isBoolean,
 };
@@ -102,6 +111,18 @@ const CODE_GENERATOR_FIELDS: Record<string, FieldCheck> = {
   decoratorName: _.isString,
   knownOptions: isStringArray,
 };
+const PROXY_OPTION_TYPES = ['string', 'headerName', 'template', 'stringList', 'enum'];
+/** the shape of `ProxyTransformOptionSpec` in proxy/types.ts */
+const isProxyOptionSpec = (val: unknown) => _.isPlainObject(val)
+  && PROXY_OPTION_TYPES.includes(val.type as string)
+  && (val.required === undefined || _.isBoolean(val.required))
+  && (val.enumValues === undefined || isStringArray(val.enumValues))
+  && (val.itemRole === undefined || val.itemRole === 'consumed' || val.itemRole === 'wire')
+  && Object.keys(val).every((key) => ['type', 'required', 'enumValues', 'itemRole'].includes(key));
+const PROXY_TRANSFORM_SCHEME_FIELDS: Record<string, FieldCheck> = {
+  scheme: _.isString,
+  options: (val) => _.isPlainObject(val) && Object.values(val).every(isProxyOptionSpec),
+};
 
 /** copies the known data fields of `def`, in a stable order, checking each one */
 function pickFields(def: Entry, fields: Record<string, FieldCheck>, nameKey: string, where: string): Entry {
@@ -111,7 +132,11 @@ function pickFields(def: Entry, fields: Record<string, FieldCheck>, nameKey: str
   const picked: Entry = {};
   for (const [field, check] of Object.entries(fields)) {
     if (def[field] === undefined) continue;
-    if (!check(def[field])) throw new Error(`${where} "${def[nameKey]}": unsupported value for "${field}"`);
+    const result = check(def[field]);
+    if (result !== true) {
+      const detail = typeof result === 'string' ? ` (${result})` : '';
+      throw new Error(`${where} "${def[nameKey]}": unsupported value for "${field}"${detail}`);
+    }
     picked[field] = def[field];
   }
   return picked;
@@ -126,8 +151,11 @@ const isStandardVars = (val: unknown) => _.isPlainObject(val)
 
 /** builds the manifest for a plugin whose module has already been executed */
 export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
-  if (plugin.proxyTransformSchemes?.length) {
-    throw new Error(`Plugin ${plugin.name} registers proxy transform schemes, which a manifest cannot describe yet`);
+  for (const schemeDef of plugin.proxyTransformSchemes ?? []) {
+    // the option specs are data, but these hooks are code that changes what a config means or allows
+    if (schemeDef.validate || schemeDef.placeAttachedItem) {
+      throw new Error(`Plugin ${plugin.name} registers proxy transform scheme "${schemeDef.scheme}" with validate() or placeAttachedItem(), which a manifest cannot describe`);
+    }
   }
   const manifest: PluginManifest = { manifestVersion: PLUGIN_MANIFEST_VERSION, name: plugin.name };
   if (plugin.icon) manifest.icon = plugin.icon;
@@ -145,12 +173,113 @@ export function createPluginManifest(plugin: VarlockPlugin): PluginManifest {
   manifest.itemDecorators = pick(plugin.itemDecorators, DECORATOR_FIELDS, 'item decorator');
   // a data type that takes settings is a function of them: describe it with no settings
   const dataTypeDefs = plugin.dataTypes?.map((d) => (typeof d === 'function' ? d() : d));
+  for (const def of dataTypeDefs ?? []) {
+    if (typeof def.validate === 'function' && !def.validationRules) {
+      throw new Error(`Data type "${def.name}" has validate() but no validationRules. Describe its checks as rules (a { custom } rule stands for a check that only runs in code)`);
+    }
+    if (typeof def.coerce === 'function' && def.validationRules?.some((rule) => !('custom' in rule))) {
+      throw new Error(`Data type "${def.name}" coerces values in code, so its validationRules (which check the string value) can't be used`);
+    }
+  }
   manifest.dataTypes = pick(dataTypeDefs, DATA_TYPE_FIELDS, 'data type').map((entry, i) => (
     typeof dataTypeDefs![i].coerce === 'function' ? { ...entry, coerceUnavailable: true } : entry
   ));
   manifest.resolvers = pick(plugin.resolverFunctions, RESOLVER_FIELDS, 'resolver');
   manifest.codeGenerators = pick(plugin.codeGenerators, CODE_GENERATOR_FIELDS, 'code generator', 'decoratorName');
+  if (plugin.proxyTransformSchemes?.length) {
+    manifest.proxyTransformSchemes = pick(plugin.proxyTransformSchemes, PROXY_TRANSFORM_SCHEME_FIELDS, 'proxy transform scheme', 'scheme');
+  }
   return manifest;
+}
+
+/** what a data type's real validate() says about a value: undefined if it passes */
+async function runValidate(validate: (val: any) => unknown, val: string) {
+  let result: unknown;
+  try {
+    result = await validate(val);
+  } catch (err) {
+    result = err;
+  }
+  const error = Array.isArray(result) ? result[0] : result;
+  if (error instanceof Error) return { message: error.message, tip: (error as any).tip as string | undefined };
+  if (result === false) return { message: '(returned false)', tip: undefined };
+  return undefined;
+}
+
+/** values that probe each rule, added to the samples a plugin gives */
+function derivedSamples(rules: Array<ValidationRule>, givenSamples: Array<string>): Array<string> {
+  const samples = ['', ' ', 'a', '0', 'x'.repeat(64), ' \t\n'];
+  for (const rule of rules) {
+    for (const key of ['startsWith', 'endsWith', 'includes'] as const) {
+      if (!(key in rule)) continue;
+      const text = (rule as Record<string, any>)[key] as string;
+      samples.push(text, text.slice(0, -1), `x${text}`, `${text}x`, `x${text}x`);
+    }
+  }
+  // each value cut or padded to just under, at and just over every length a rule names,
+  // so a boundary is probed with values that pass the other rules too
+  const base = [...givenSamples, ...samples];
+  for (const rule of rules) {
+    for (const key of ['minLength', 'maxLength', 'isLength'] as const) {
+      if (!(key in rule)) continue;
+      const length = (rule as Record<string, any>)[key] as number;
+      for (const target of [length - 1, length, length + 1]) {
+        if (target < 0) continue;
+        for (const sample of base) {
+          samples.push(sample.length >= target ? sample.slice(0, target) : sample.padEnd(target, 'a'));
+        }
+      }
+    }
+  }
+  return samples;
+}
+
+/**
+ * Checks that a data type's `validationRules` give the same result as its `validate()` on its
+ * `validationSamples` (plus values derived from the rules), and that the samples make every rule
+ * fail at least once. Returns the problems found. This runs plugin code: only use it at build time.
+ */
+export async function checkDataTypeValidationRules(def: {
+  name: string,
+  validate?: (val: any) => unknown,
+  validationRules?: Array<ValidationRule>,
+  validationSamples?: Array<string>,
+}): Promise<Array<string>> {
+  const rules = def.validationRules;
+  if (!rules || !def.validate) return [];
+  const problems: Array<string> = [];
+  const where = `data type "${def.name}"`;
+  const givenSamples = def.validationSamples ?? [];
+  const samples = [...new Set([...givenSamples, ...derivedSamples(rules, givenSamples)])];
+  const failedRules = new Set<number>();
+  let someSamplePasses = false;
+  for (const sample of samples) {
+    const fromRules = checkValidationRules(sample, rules);
+    const fromCode = await runValidate(def.validate, sample);
+    const shown = JSON.stringify(sample);
+    if (fromRules.passed === false) {
+      failedRules.add(fromRules.index);
+      const { message, tip } = fromRules.rule;
+      if (!fromCode) {
+        problems.push(`${where}: rule ${fromRules.index + 1} rejects ${shown}, but validate() accepts it`);
+      } else if (fromCode.message !== message || fromCode.tip !== tip) {
+        problems.push(`${where}: for ${shown} rule ${fromRules.index + 1} gives ${JSON.stringify(message)}, but validate() gives ${JSON.stringify(fromCode.message)}${fromCode.tip !== tip ? ' (or a different tip)' : ''}`);
+      }
+    } else {
+      someSamplePasses = true;
+      // past a custom rule, only the plugin's code knows the answer
+      if (fromRules.passed === true && fromCode) {
+        problems.push(`${where}: the rules accept ${shown}, but validate() rejects it with ${JSON.stringify(fromCode.message)}`);
+      }
+    }
+  }
+  rules.forEach((rule, i) => {
+    if (!('custom' in rule) && !failedRules.has(i)) {
+      problems.push(`${where}: no sample fails rule ${i + 1} (${validationRuleCheckName(rule)}), add one to validationSamples`);
+    }
+  });
+  if (!someSamplePasses) problems.push(`${where}: no sample passes the rules, add one to validationSamples`);
+  return problems;
 }
 
 /**
@@ -184,6 +313,7 @@ export function parsePluginManifest(raw: unknown, expectedName: string, manifest
     ['dataTypes', DATA_TYPE_FIELDS, 'name'],
     ['resolvers', RESOLVER_FIELDS, 'name'],
     ['codeGenerators', CODE_GENERATOR_FIELDS, 'decoratorName'],
+    ['proxyTransformSchemes', PROXY_TRANSFORM_SCHEME_FIELDS, 'scheme'],
   ] as const;
   for (const [section, fields, nameKey] of sections) {
     const entries = raw[section];
@@ -218,6 +348,14 @@ export function applyPluginManifest(plugin: VarlockPlugin, manifest: PluginManif
   }
   for (const def of manifest.codeGenerators ?? []) {
     plugin.registerCodeGenerator({ ...def, generate: cannotRun(`@${def.decoratorName}`) } as any);
+  }
+  // the option specs are enough to check a transform config; apply() only runs in the proxy
+  for (const def of manifest.proxyTransformSchemes ?? []) {
+    plugin.registerProxyTransformScheme({
+      scheme: def.scheme as string,
+      options: def.options as Record<string, ProxyTransformOptionSpec>,
+      apply: cannotRun(`proxy transform scheme "${def.scheme}"`),
+    });
   }
   plugin.loadedFromManifest = true;
 }

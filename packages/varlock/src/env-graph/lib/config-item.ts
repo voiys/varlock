@@ -1262,6 +1262,11 @@ export class ConfigItem {
         throw new ValidationError('validation failed with `false` return value');
       }
       this.isValidated = true;
+      // shape mode: the type's rules passed, but its last check is plugin code that did not run
+      // (the plugin was read from its manifest), so the value is known but not fully validated
+      if (this.envGraph.mode === 'shape' && dataType._isValidationIncomplete) {
+        this.envGraph.shapeSkipped.push({ kind: 'validate', name: dataType.name, itemKey: this.key });
+      }
 
       // Redaction can only protect what it can match: a string, long enough not to
       // collide with ordinary text. What follows reports where that does not hold.

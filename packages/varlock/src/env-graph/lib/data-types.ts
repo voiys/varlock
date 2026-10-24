@@ -2,6 +2,7 @@ import _ from '@env-spec/utils/my-dash';
 import { type FallbackIfUnknown } from '@env-spec/utils/type-utils';
 import { CoercionError, ValidationError, type ErrorSeverity } from './errors';
 import { parseRegexLikeString } from './regex-like-string';
+import { checkValidationRules, type ValidationRule } from './validation-rules';
 import {
   parseDuration, convertDurationFromMs, type DurationUnit,
 } from '../../lib/duration';
@@ -54,6 +55,19 @@ type EnvGraphDataTypeDef<CoerceReturnType, ValidateInputType = FallbackIfUnknown
    * - if validation fails, should return a ValidationError or array of errors - or throw an error
    * */
   validate?: (value: ValidateInputType) => MaybePromise<(true | undefined | void | Error | Array<Error>)>;
+
+  /**
+   * The checks `validate` makes, as data (see validation-rules.ts), so tools that do not run plugin
+   * code can check values too. A plugin manifest carries them. When `validate` is set it is what
+   * runs, and the rules must agree with it: generating a plugin manifest checks that on
+   * `validationSamples`. A type with rules and no `validate` is validated by the rules.
+   */
+  validationRules?: Array<ValidationRule>;
+  /**
+   * Values (passing and failing) on which `validationRules` must give the same result as `validate`.
+   * Every rule needs a value that fails it. Only used when generating a plugin manifest.
+   */
+  validationSamples?: Array<string>;
 
   /**
    * Optional placeholder generator used by proxy mode. Receives a unique,
@@ -140,6 +154,17 @@ export class EnvGraphDataType {
     return _.isPlainObject(settings)
       && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val.coerceUnavailable);
   }
+  /**
+   * @internal true when validation ends in a check that only plugin code makes (a `custom` rule) and
+   * that code is not here (the type was read from a plugin manifest). Also true for a composite
+   * type built from one.
+   */
+  get _isValidationIncomplete(): boolean {
+    if (!this.def.validate && this.def.validationRules?.some((rule) => 'custom' in rule)) return true;
+    const settings = this.usageArgs[0];
+    return _.isPlainObject(settings)
+      && Object.values(settings).some((val) => val instanceof EnvGraphDataType && val._isValidationIncomplete);
+  }
 
   generatePlaceholder(seed: string) {
     return this.def.generatePlaceholder?.(seed);
@@ -156,7 +181,12 @@ export class EnvGraphDataType {
   }
 
   validate(val: any) {
-    return this.def.validate ? this.def.validate(val) : true;
+    if (this.def.validate) return this.def.validate(val);
+    if (this.def.validationRules) {
+      const result = checkValidationRules(val, this.def.validationRules);
+      return result.passed === false ? result.error : true;
+    }
+    return true;
   }
 
   /** serialize a coerced value back to the string form injected into process.env */

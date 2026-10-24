@@ -9,6 +9,8 @@ import {
   EnvGraph, DotEnvFileDataSource, collectTypeGenItems, generateTsTypesSrc, resolveFieldTypes,
 } from '../index';
 import { generatePluginManifest } from '../lib/plugins';
+import { checkDataTypeValidationRules } from '../lib/plugin-manifest';
+import { ValidationError } from '../lib/errors';
 
 // The fixture plugin counts its own module executions in this global, so every test can check
 // whether its code ran. Each "it did not run" assertion has a control where it does run.
@@ -65,6 +67,9 @@ async function describeGraph(g: EnvGraph) {
       resolvers: Object.keys(g.registeredResolverFunctions),
       codeGenerators: Object.keys(g.codeGeneratorsRegistry),
     },
+    proxyTransformSchemeOptions: Object.fromEntries(
+      Object.entries(g.proxyTransformSchemes).map(([name, def]) => [name, def.options]),
+    ),
     resolverDefs: Object.fromEntries(Object.entries(g.registeredResolverFunctions).map(([name, r]) => {
       const { resolve: _resolve, process: _process, ...data } = (r as any).def;
       return [name, data];
@@ -139,19 +144,100 @@ describe('plugin manifests', () => {
     expect(await describeGraph(fromManifest.g)).toEqual(expected);
   });
 
-  test('validation and other plugin code is not carried by a manifest', async () => {
-    // the plugin's own checks (a data type's validate(), a resolver's process()) only run when it is executed
-    const schema = schemaFor(FIXTURE_DIR, 'BAD_TOKEN=nope # @type=manifestTestToken\nDYNAMIC=manifestFetch($PORT)');
+  /** loads a schema with the plugin read from its manifest, and with the plugin executed */
+  async function loadBoth(items: string) {
+    const schema = schemaFor(FIXTURE_DIR, items);
     const withoutManifest = copyFixture({ packageJson: (pkg) => delete pkg.exports['./manifest'] });
     const executed = await load(schema.replace(FIXTURE_DIR, withoutManifest), 'shape');
     const fromManifest = await load(schema, 'shape');
     await executed.g.resolveEnvValues();
     await fromManifest.g.resolveEnvValues();
-    const errorsOf = ({ g }: { g: EnvGraph }) => Object.fromEntries(
-      ['BAD_TOKEN', 'DYNAMIC'].map((key) => [key, g.configSchema[key].errors.filter((e) => !e.isWarning).map((e) => e.message)]),
-    );
-    expect(errorsOf(executed)).toEqual({ BAD_TOKEN: ['must start with mt_'], DYNAMIC: ['manifestFetch(): expected a static name'] });
-    expect(errorsOf(fromManifest)).toEqual({ BAD_TOKEN: [], DYNAMIC: [] });
+    expect(fromManifest.g.plugins[0].loadedFromManifest).toBe(true);
+    return { executed, fromManifest };
+  }
+  const errorsOf = ({ g }: { g: EnvGraph }, keys: Array<string>) => Object.fromEntries(keys.map((key) => [
+    key,
+    g.configSchema[key].errors.filter((e) => !e.isWarning).map((e) => ({ message: e.message, tip: (e as any).tip })),
+  ]));
+
+  test("a data type's validationRules give the same errors as the plugin's validate()", async () => {
+    const { executed, fromManifest } = await loadBoth(outdent`
+      # @type=manifestTestToken
+      GOOD_TOKEN=mt_abc123
+      # @type=manifestTestToken
+      BAD_TOKEN=nope
+      # @type=manifestTestToken
+      SHORT_TOKEN=mt_ab
+      # @type=array(manifestTestToken)
+      TOKEN_LIST=mt_abc123,nope
+    `);
+    const keys = ['GOOD_TOKEN', 'BAD_TOKEN', 'SHORT_TOKEN', 'TOKEN_LIST'];
+    const tokenError = { message: 'must start with mt_', tip: 'tokens look like mt_abc123' };
+    expect(errorsOf(executed, keys)).toMatchObject({
+      GOOD_TOKEN: [],
+      BAD_TOKEN: [tokenError],
+      SHORT_TOKEN: [{ message: 'too short', tip: undefined }],
+      TOKEN_LIST: [{ message: expect.stringContaining('must start with mt_') }],
+    });
+    expect(errorsOf(fromManifest, keys)).toEqual(errorsOf(executed, keys));
+    expect(fromManifest.g.configSchema.GOOD_TOKEN.resolvedValue).toBe('mt_abc123');
+    expect(fromManifest.g.shapeSkipped.filter((s) => s.kind === 'validate')).toEqual([]);
+  });
+
+  test('a custom rule stops the static check: the value stays known, the skipped check is recorded', async () => {
+    const { executed, fromManifest } = await loadBoth(outdent`
+      # @type=manifestTestJson
+      JSON_OK={"a":1}
+      # @type=manifestTestJson
+      NOT_OBJECT=[1]
+      # @type=manifestTestJson
+      NOT_JSON={nope
+    `);
+    const keys = ['JSON_OK', 'NOT_OBJECT', 'NOT_JSON'];
+    expect(errorsOf(executed, keys)).toEqual({
+      JSON_OK: [],
+      NOT_OBJECT: [{ message: 'must be a JSON object', tip: undefined }],
+      NOT_JSON: [{ message: 'must be valid JSON', tip: undefined }],
+    });
+    // the rule before the custom one still catches NOT_OBJECT, but only plugin code can say NOT_JSON is bad
+    expect(errorsOf(fromManifest, keys)).toEqual({ ...errorsOf(executed, keys), NOT_JSON: [] });
+    expect(fromManifest.g.configSchema.NOT_JSON.resolvedValue).toBe('{nope');
+    expect(fromManifest.g.shapeSkipped.filter((s) => s.kind === 'validate')).toEqual([
+      { kind: 'validate', name: 'manifestTestJson', itemKey: 'JSON_OK' },
+      { kind: 'validate', name: 'manifestTestJson', itemKey: 'NOT_JSON' },
+    ]);
+    expect(executed.g.shapeSkipped.filter((s) => s.kind === 'validate')).toEqual([]);
+  });
+
+  test("a resolver's process() is still not carried by a manifest", async () => {
+    const { executed, fromManifest } = await loadBoth('DYNAMIC=manifestFetch($PORT)');
+    const messages = ({ g }: { g: EnvGraph }) => g.configSchema.DYNAMIC.errors
+      .filter((e) => !e.isWarning).map((e) => e.message);
+    expect(messages(executed)).toEqual(['manifestFetch(): expected a static name']);
+    expect(messages(fromManifest)).toEqual([]);
+  });
+
+  test('a proxy transform scheme from a manifest checks transform configs like the plugin does', async () => {
+    const proxySchema = (transform: string) => outdent`
+      # @proxy(domain="api.example.com", transform={scheme="manifest-test-sign", ${transform}})
+      # @sensitive
+      SIGNING_SECRET=shh
+      KEY_ID=abc
+    `;
+    for (const [transform, error] of [
+      ['keyId=$KEY_ID, region=eu', undefined],
+      ['keyId=$KEY_ID, regoin=eu', /unknown transform option "regoin" for scheme "manifest-test-sign"/],
+      ['keyId=$KEY_ID, region=asia', /region/],
+      ['region=eu', /keyId/],
+    ] as const) {
+      const { executed, fromManifest } = await loadBoth(proxySchema(transform));
+      const outcome = async ({ g }: { g: EnvGraph }) => g.getProxyRules()
+        .then((rules) => rules, (err: Error) => err.message);
+      const fromExecuted = await outcome(executed);
+      if (error) expect(fromExecuted).toMatch(error);
+      else expect(fromExecuted).toMatchObject([{ transform: { scheme: 'manifest-test-sign', keyId: { itemRef: 'KEY_ID' } } }]);
+      expect(await outcome(fromManifest)).toEqual(fromExecuted);
+    }
   });
 
   test('a value whose type the plugin coerces in code is unknown, and so are values built from it', async () => {
@@ -215,6 +301,12 @@ describe('plugin manifests', () => {
     ['has a malformed entry', { manifest: (m: any) => { m.resolvers[0].argsSchema = { type: 'nope' }; } }, /unsupported value for "argsSchema"/],
     ['has a malformed coercedType', { manifest: (m: any) => { m.dataTypes[1].coercedType = { recordOf: null }; } }, /unsupported value for "coercedType"/],
     ['has a nested malformed coercedType', { manifest: (m: any) => { m.dataTypes[1].coercedType = { arrayOf: { enum: 'bad' } }; } }, /unsupported value for "coercedType"/],
+    ['has a rule with a regex that does not compile', { manifest: (m: any) => { m.dataTypes[0].validationRules[0] = { matches: '/a(/', message: 'x' }; } }, /unsupported value for "validationRules" \(rule 1 has an unsupported value for "matches"\)/],
+    ['has a rule with two checks', { manifest: (m: any) => { m.dataTypes[0].validationRules[0].endsWith = 'x'; } }, /rule 1 must have exactly one of/],
+    ['has a rule with no message', { manifest: (m: any) => { delete m.dataTypes[0].validationRules[1].message; } }, /rule 2 needs a "message"/],
+    ['has a custom rule that is not last', { manifest: (m: any) => { m.dataTypes[2].validationRules.reverse(); } }, /rule 1 is custom, so it must be the last rule/],
+    ['has a rule with an unknown check', { manifest: (m: any) => { m.dataTypes[0].validationRules[0] = { isEmail: true, message: 'x' }; } }, /rule 1 must have exactly one of/],
+    ['has a malformed proxy option spec', { manifest: (m: any) => { m.proxyTransformSchemes[0].options.keyId.type = 'number'; } }, /proxy transform scheme|proxyTransformSchemes/],
     ['is outside the package', { packageJson: (pkg: any) => { pkg.exports['./manifest'] = '../outside.json'; } }, /outside its package/],
     ['is missing', { packageJson: (pkg: any) => { pkg.exports['./manifest'] = './missing.json'; } }, /could not be read/],
   ])('a manifest that %s is a schema error, and the plugin does not run', async (_label, edit, message) => {
@@ -248,6 +340,31 @@ describe('plugin manifests', () => {
     `);
     await expect(generatePluginManifest(dir)).rejects.toThrow(/resolver "rx": unsupported value for "inferredTypeSettings"/);
 
+    const writePlugin = (name: string, src: string) => {
+      const pluginDir = path.join(tmpDir, name);
+      fs.mkdirSync(pluginDir);
+      fs.writeFileSync(path.join(pluginDir, 'package.json'), JSON.stringify({ name, exports }));
+      fs.writeFileSync(path.join(pluginDir, 'plugin.js'), `const { plugin, ValidationError } = require('varlock/plugin-lib');\n${src}`);
+      return pluginDir;
+    };
+    await expect(generatePluginManifest(writePlugin('no-rules', outdent`
+      plugin.registerDataType({ name: 'noRules', validate: () => true });
+    `))).rejects.toThrow(/"noRules" has validate\(\) but no validationRules/);
+    await expect(generatePluginManifest(writePlugin('coerce-rules', outdent`
+      plugin.registerDataType({ name: 'coerced', coerce: Number, validationRules: [{ minLength: 1, message: 'x' }] });
+    `))).rejects.toThrow(/"coerced" coerces values in code/);
+    await expect(generatePluginManifest(writePlugin('drift', outdent`
+      plugin.registerDataType({
+        name: 'drifted',
+        validationRules: [{ startsWith: 'tok_', message: 'must start with tok_' }],
+        validationSamples: ['tok_1', 'nope'],
+        validate(val) { if (!val.startsWith('tok-')) throw new ValidationError('must start with tok-'); },
+      });
+    `))).rejects.toThrow(/validationRules that do not match its validate\(\)[\s\S]*"drifted": the rules accept "tok_1", but validate\(\) rejects it/);
+    await expect(generatePluginManifest(writePlugin('scheme-hook', outdent`
+      plugin.registerProxyTransformScheme({ scheme: 'hooked', options: {}, validate: () => undefined, apply: () => ({}) });
+    `))).rejects.toThrow(/scheme "hooked" with validate\(\) or placeAttachedItem\(\)/);
+
     const noExport = copyFixture({ packageJson: (pkg) => delete pkg.exports['./manifest'] });
     await expect(generatePluginManifest(noExport)).rejects.toThrow(/has no "\.\/manifest" export/);
     const outside = copyFixture({
@@ -256,5 +373,59 @@ describe('plugin manifests', () => {
       },
     });
     await expect(generatePluginManifest(outside)).rejects.toThrow(/outside its package/);
+  });
+});
+
+describe('checkDataTypeValidationRules', () => {
+  const startsWithAbc = (val: string) => {
+    if (!val.startsWith('abc')) throw new ValidationError('must start with abc', { tip: 'like abc123' });
+    if (val.length > 8) return new ValidationError('too long');
+  };
+  const rules = [
+    { startsWith: 'abc', message: 'must start with abc', tip: 'like abc123' },
+    { maxLength: 8, message: 'too long' },
+  ];
+
+  test('passes when the rules say what validate() says', async () => {
+    expect(await checkDataTypeValidationRules({ name: 't', validate: startsWithAbc, validationRules: rules })).toEqual([]);
+  });
+
+  test('finds a different message, a different tip, and a boundary the rules get wrong', async () => {
+    expect(await checkDataTypeValidationRules({
+      name: 't', validate: startsWithAbc, validationRules: [{ ...rules[0], message: 'must begin with abc' }, rules[1]],
+    })).toContainEqual(expect.stringMatching(/rule 1 gives "must begin with abc", but validate\(\) gives "must start with abc"/));
+    expect(await checkDataTypeValidationRules({
+      name: 't', validate: startsWithAbc, validationRules: [{ ...rules[0], tip: 'other' }, rules[1]],
+    })).toContainEqual(expect.stringMatching(/\(or a different tip\)/));
+    // values cut to just around the length are derived from the given samples, so this is found
+    // without a sample of exactly the wrong length
+    expect(await checkDataTypeValidationRules({
+      name: 't', validate: startsWithAbc, validationRules: [rules[0], { maxLength: 7, message: 'too long' }], validationSamples: ['abc12345678'],
+    })).toContainEqual(expect.stringMatching(/rule 2 rejects "abc12345", but validate\(\) accepts it/));
+  });
+
+  test('needs a sample that fails each rule, and one that passes', async () => {
+    expect(await checkDataTypeValidationRules({
+      name: 't', validate: () => true, validationRules: [{ matches: '/^/', message: 'never fails' }],
+    })).toEqual(['data type "t": no sample fails rule 1 (matches), add one to validationSamples']);
+
+    const fiveDigits = [{ matches: '/^[0-9]{5}$/', message: 'five digits' }];
+    const validate = (val: string) => (/^[0-9]{5}$/.test(val) ? true : new ValidationError('five digits'));
+    // none of the values derived from the rules pass this one
+    expect(await checkDataTypeValidationRules({ name: 't', validate, validationRules: fiveDigits }))
+      .toEqual(['data type "t": no sample passes the rules, add one to validationSamples']);
+    expect(await checkDataTypeValidationRules({
+      name: 't', validate, validationRules: fiveDigits, validationSamples: ['12345'],
+    })).toEqual([]);
+  });
+
+  test('says nothing about values past a custom rule', async () => {
+    const validate = (val: string) => {
+      if (!val) throw new ValidationError('empty');
+      JSON.parse(val);
+    };
+    expect(await checkDataTypeValidationRules({
+      name: 't', validate, validationRules: [{ minLength: 1, message: 'empty' }, { custom: 'parses as JSON' }],
+    })).toEqual([]);
   });
 });

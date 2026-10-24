@@ -43,13 +43,42 @@
           "description": "Manifest test docs",
           "url": "https://example.com/docs"
         }
+      ],
+      "validationRules": [
+        {
+          "startsWith": "mt_",
+          "message": "must start with mt_",
+          "tip": "tokens look like mt_abc123"
+        },
+        {
+          "minLength": 6,
+          "message": "too short"
+        }
       ]
     },
     {
       "name": "manifestTestPort",
       "icon": "mdi:ethernet",
       "coercedType": "int",
+      "validationRules": [
+        {
+          "custom": "at most the max setting"
+        }
+      ],
       "coerceUnavailable": true
+    },
+    {
+      "name": "manifestTestJson",
+      "validationRules": [
+        {
+          "startsWith": "{",
+          "message": "must be a JSON object"
+        },
+        {
+          "custom": "parses as JSON",
+          "message": "must be valid JSON"
+        }
+      ]
     }
   ],
   "resolvers": [
@@ -72,6 +101,25 @@
       "knownOptions": [
         "flavor"
       ]
+    }
+  ],
+  "proxyTransformSchemes": [
+    {
+      "scheme": "manifest-test-sign",
+      "options": {
+        "keyId": {
+          "required": true,
+          "type": "string",
+          "itemRole": "wire"
+        },
+        "region": {
+          "type": "enum",
+          "enumValues": [
+            "eu",
+            "us"
+          ]
+        }
+      }
     }
   ]
 }
