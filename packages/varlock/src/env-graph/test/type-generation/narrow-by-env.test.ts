@@ -206,12 +206,49 @@ describe('@generateTsTypes narrowByEnv', () => {
       expect(src).not.toContain('readonly ALWAYS_OPTIONAL:');
     });
 
-    test('is unchanged unless the option is set', async () => {
+    test('is on by default when it applies, and narrowByEnv=false turns it off', async () => {
       const g = await loadGraph({ envFile: ISSUE_SCHEMA.replace('OUTPUT_PATH', 'unused.d.ts') });
       const fields = resolveFieldTypes(Object.values(await getTypeGenInfoMap(g)));
-      const src = await generateTsTypesSrc(fields, { envFlagKey: 'APP_ENV' });
-      expect(src).not.toContain('CoercedEnvSchemaByEnv');
-      expect(src).not.toContain('TypedEnvByEnv');
+      const byDefault = await generateTsTypesSrc(fields, { envFlagKey: 'APP_ENV' });
+      expect(byDefault).toContain('CoercedEnvSchemaByEnv');
+      expect(byDefault).toContain('TypedEnvByEnv');
+      const off = await generateTsTypesSrc(fields, { envFlagKey: 'APP_ENV', narrowByEnv: false });
+      expect(off).not.toContain('CoercedEnvSchemaByEnv');
+      expect(off).not.toContain('TypedEnvByEnv');
+    });
+
+    test('by default, a schema it cannot narrow keeps the plain type without an error', async () => {
+      const cases = [
+        outdent`
+          # @generateTsTypes(path=unused.d.ts)
+          # ---
+          # @required=forEnv(prod)
+          ITEM=foo
+        `,
+        outdent`
+          # @currentEnv=$APP_ENV
+          # @generateTsTypes(path=unused.d.ts)
+          # ---
+          APP_ENV=dev
+          # @required=forEnv(prod)
+          ITEM=foo
+        `,
+        // an enum env flag, but nothing depends on it: no union for a single member
+        outdent`
+          # @currentEnv=$APP_ENV
+          # @generateTsTypes(path=unused.d.ts)
+          # ---
+          # @type=enum(dev, prod)
+          APP_ENV=dev
+          ITEM=foo
+        `,
+      ];
+      for (const envFile of cases) {
+        const g = await loadGraph({ envFile });
+        const fields = resolveFieldTypes(Object.values(await getTypeGenInfoMap(g)));
+        const src = await generateTsTypesSrc(fields, { envFlagKey: g.rootDataSource?.envFlagKey });
+        expect(src).not.toContain('CoercedEnvSchemaByEnv');
+      }
     });
 
     test('envs with the same required items share one union member', async () => {
@@ -220,7 +257,7 @@ describe('@generateTsTypes narrowByEnv', () => {
       expect(generated).toContain('readonly APP_ENV: "dev" | "staging"; readonly DATABASE_PASSWORD: NonNullable<CoercedEnvSchema["DATABASE_PASSWORD"]> })');
       expect(generated).toContain('readonly APP_ENV: "prod"; readonly DATABASE_PASSWORD: NonNullable<CoercedEnvSchema["DATABASE_PASSWORD"]>; readonly SENTRY_DSN: NonNullable<CoercedEnvSchema["SENTRY_DSN"]> })');
       expect(generated).toContain('readonly APP_ENV: "building" })');
-      expect(generated).toMatch(/export interface TypedEnvByEnv \{ env: _CoercedEnvSchemaByEnv_[0-9a-f]+ \}/);
+      expect(generated).toMatch(/export interface TypedEnvByEnv \{ "[0-9a-f]+": \{ env: _CoercedEnvSchemaByEnv_[0-9a-f]+ \} \}/);
     });
 
     test('rejects schemas it cannot narrow', async () => {
@@ -297,20 +334,101 @@ describe('@generateTsTypes narrowByEnv', () => {
       expect(errors).toEqual([]);
     }, 30_000);
 
-    test('without the option, ENV keeps its plain type', async () => {
+    test('without the option, ENV narrows too (it is the default)', async () => {
       const { errors } = await generateAndTypecheck({
         schema: ISSUE_SCHEMA.replace(', narrowByEnv=true', ''),
         checkSrc: outdent`
           import { ENV } from 'varlock/env';
 
           if (ENV.APP_ENV !== 'building') {
-            // @ts-expect-error not narrowed without narrowByEnv
             const pw: string = ENV.DATABASE_PASSWORD;
           }
           const req: string = ENV.ALWAYS_REQUIRED;
         `,
       });
       expect(errors).toEqual([]);
+    }, 30_000);
+
+    test('with narrowByEnv=false, ENV keeps its plain type', async () => {
+      const { errors } = await generateAndTypecheck({
+        schema: ISSUE_SCHEMA.replace('narrowByEnv=true', 'narrowByEnv=false'),
+        checkSrc: outdent`
+          import { ENV } from 'varlock/env';
+
+          if (ENV.APP_ENV !== 'building') {
+            // @ts-expect-error not narrowed with narrowByEnv=false
+            const pw: string = ENV.DATABASE_PASSWORD;
+          }
+          const req: string = ENV.ALWAYS_REQUIRED;
+        `,
+      });
+      expect(errors).toEqual([]);
+    }, 30_000);
+
+    test('several global generated files (a monorepo) all narrow ENV', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'varlock-narrow-by-env-'));
+      tmpDirs.push(dir);
+      const schemas: Array<[string, string, string]> = [
+        [
+          'a.d.ts', 'APP_ENV', outdent`
+          # @currentEnv=$APP_ENV
+          # ---
+          # @type=enum(dev, prod)
+          APP_ENV=dev
+          # @required=forEnv(prod)
+          A_DSN=
+        `,
+        ],
+        [
+          'b.d.ts', 'STAGE', outdent`
+          # @currentEnv=$STAGE
+          # ---
+          # @type=enum(local, live)
+          STAGE=local
+          # @required=forEnv(live)
+          B_KEY=
+        `,
+        ],
+      ];
+      for (const [file, envFlagKey, envFile] of schemas) {
+        const fields = resolveFieldTypes(Object.values(await getTypeGenInfoMap(await loadGraph({ envFile }))));
+        fs.writeFileSync(path.join(dir, file), await generateTsTypesSrc(fields, { envFlagKey, fetchIcons: false }));
+      }
+      const checkFile = path.join(dir, 'check.ts');
+      fs.writeFileSync(checkFile, outdent`
+        import { ENV } from 'varlock/env';
+
+        if (ENV.APP_ENV === 'prod') {
+          const a: string = ENV.A_DSN;
+        }
+        if (ENV.STAGE === 'live') {
+          const b: string = ENV.B_KEY;
+        }
+        // @ts-expect-error not narrowed outside the check
+        const a2: string = ENV.A_DSN;
+        // @ts-expect-error not narrowed outside the check
+        const b2: string = ENV.B_KEY;
+      `);
+      // both file orders: before, the file TypeScript saw first decided which package narrowed
+      for (const order of [['a.d.ts', 'b.d.ts'], ['b.d.ts', 'a.d.ts']]) {
+        const program = ts.createProgram({
+          rootNames: [...order.map((f) => path.join(dir, f)), checkFile],
+          options: {
+            noEmit: true,
+            strict: true,
+            target: ts.ScriptTarget.ES2022,
+            module: ts.ModuleKind.ESNext,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
+            skipLibCheck: true,
+            types: [],
+            paths: { 'varlock/env': [VARLOCK_ENV_SRC] },
+          },
+          host: compilerHost,
+        });
+        const sourceFile = program.getSourceFile(checkFile)!;
+        const errors = program.getSemanticDiagnostics(sourceFile).map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
+        expect(errors).toEqual([]);
+      }
     }, 30_000);
 
     test('exposeEnv=local exports a narrowed ENV', async () => {

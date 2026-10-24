@@ -205,10 +205,12 @@ export type TsGenOptions = {
   fetchIcons?: boolean;
   /**
    * Type `ENV` as a union with one member per group of environments, discriminated by the
-   * @currentEnv item, so checking it narrows which items are required (defaults to false).
-   * Only requiredness that is known statically (`forEnv()` with static args) is narrowed.
+   * @currentEnv item, so checking it narrows which items are required. Only requiredness that is
+   * known statically (`forEnv()` with static args) is narrowed. `auto` (the default) does this
+   * whenever it applies: an enum @currentEnv and at least one item whose requiredness depends on it.
+   * `true` also reports why it can't, `false` turns it off.
    */
-  narrowByEnv?: boolean;
+  narrowByEnv?: boolean | 'auto';
   /** key of the @currentEnv item (set from the graph, not a decorator arg) */
   envFlagKey?: string;
 };
@@ -227,7 +229,7 @@ const DEFAULT_TS_GEN_OPTIONS = {
   icons: true,
   pluginIcons: {},
   fetchIcons: true,
-  narrowByEnv: false,
+  narrowByEnv: 'auto',
   envFlagKey: '',
 } satisfies Required<TsGenOptions>;
 
@@ -265,7 +267,9 @@ function resolveTsGenOptions(options: Record<string, any> = {}): Required<TsGenO
     icons: coerceBooleanOption(options.icons, DEFAULT_TS_GEN_OPTIONS.icons, 'icons'),
     pluginIcons: options.pluginIcons ?? DEFAULT_TS_GEN_OPTIONS.pluginIcons,
     fetchIcons: options.fetchIcons ?? DEFAULT_TS_GEN_OPTIONS.fetchIcons,
-    narrowByEnv: coerceBooleanOption(options.narrowByEnv, DEFAULT_TS_GEN_OPTIONS.narrowByEnv, 'narrowByEnv'),
+    narrowByEnv: options.narrowByEnv === undefined || options.narrowByEnv === null
+      ? DEFAULT_TS_GEN_OPTIONS.narrowByEnv
+      : coerceBooleanOption(options.narrowByEnv, false, 'narrowByEnv'),
     envFlagKey: options.envFlagKey || '',
   };
 }
@@ -277,6 +281,13 @@ function resolveTsGenOptions(options: Record<string, any> = {}): Required<TsGenO
  * (rather than `Omit<...> & {...}`) keep every property linked to its declaration in the base
  * schema, so go-to-definition and rename still work from `ENV.X`.
  */
+/** Whether `narrowByEnv` has anything to do: an enum @currentEnv and an item whose requiredness depends on it. */
+function canNarrowByEnv(fields: Array<ResolvedFieldType>, envFlagKey: string) {
+  const envType = envFlagKey ? fields.find((f) => f.key === envFlagKey)?.coerced : undefined;
+  const isEnum = typeof envType === 'object' && 'enum' in envType && envType.enum.length > 0;
+  return isEnum && fields.some((f) => f.requiredByEnv);
+}
+
 function getEnvNarrowedMembers(fields: Array<ResolvedFieldType>, envFlagKey: string): Array<string> {
   const errPrefix = '@generateTsTypes - `narrowByEnv`';
   if (!envFlagKey) throw new Error(`${errPrefix} needs @currentEnv to be set`);
@@ -356,7 +367,8 @@ export async function generateTsTypesSrc(fields: Array<ResolvedFieldType>, optio
 
   // `narrowByEnv`: the schema split by the current environment, so checks narrow requiredness
   const narrowedAlias = `_CoercedEnvSchemaByEnv_${schemaHash}`;
-  if (opts.narrowByEnv) {
+  const narrowByEnv = opts.narrowByEnv === 'auto' ? canNarrowByEnv(fields, opts.envFlagKey) : opts.narrowByEnv;
+  if (narrowByEnv) {
     const members = getEnvNarrowedMembers(fields, opts.envFlagKey);
     tsSrc.push(
       '',
@@ -386,8 +398,8 @@ export async function generateTsTypesSrc(fields: Array<ResolvedFieldType>, optio
     tsSrc.push(`
 declare module 'varlock/env' {
   export interface TypedEnvSchema extends Readonly<${schemaAlias}> {}
-  export interface PublicTypedEnvSchema extends Readonly<${pickPublic(schemaAlias)}> {}${opts.narrowByEnv ? `
-  export interface TypedEnvByEnv { env: ${narrowedAlias} }` : ''}
+  export interface PublicTypedEnvSchema extends Readonly<${pickPublic(schemaAlias)}> {}${narrowByEnv ? `
+  export interface TypedEnvByEnv { ${JSON.stringify(schemaHash)}: { env: ${narrowedAlias} } }` : ''}
 }
 `);
   }
@@ -434,7 +446,7 @@ export type ProcessEnvSchemaAsStrings = {
 export type PublicCoercedEnvSchema = Readonly<${pickPublic('CoercedEnvSchema')}>;
 
 // re-export of the runtime ENV proxy, typed to this package's schema
-export const ENV = _ENV as unknown as ${opts.narrowByEnv ? 'CoercedEnvSchemaByEnv' : 'Readonly<CoercedEnvSchema>'};
+export const ENV = _ENV as unknown as ${narrowByEnv ? 'CoercedEnvSchemaByEnv' : 'Readonly<CoercedEnvSchema>'};
 `);
   }
 

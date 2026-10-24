@@ -30,7 +30,7 @@ You can control what it emits:
 
 - **`exposeEnv`**: where the coerced `ENV` object lives: `global` (default, augments `varlock/env`), `local` (export a package-local `ENV` from the generated file, ideal for monorepos), or `none`.
 - **`processEnv`** / **`importMetaEnv`**: `strict` (only defined keys), `loose` (also allow extra keys), or `none` (don't augment).
-- **`narrowByEnv`**: set `true` to type `ENV` per environment, so that `if (ENV.APP_ENV === 'production')` narrows items marked `@required=forEnv(production)` to non-optional.
+- **`narrowByEnv`**: `ENV` is typed per environment, so that `if (ENV.APP_ENV === 'production')` narrows items marked `@required=forEnv(production)` to non-optional. On by default whenever it applies; set `false` to turn it off.
 - **`icons`**: set `false` to leave item icons out of the generated JSDoc. Icons for built-in data types and official plugins ship with varlock, but custom [`@icon`](/reference/item-decorators/#icon) values are fetched from Iconify during generation, so turn this off if the generated file must not depend on network access (for example, a committed file checked for drift in CI).
 
 See the [`@generateTsTypes` reference](/reference/root-decorators/#generatetstypes) for details. In monorepos where multiple packages have different schemas, prefer `exposeEnv=local` to avoid global augmentation clashes. See [Typed `ENV` across packages](/guides/monorepos/#typed-env-across-packages).

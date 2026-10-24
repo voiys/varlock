@@ -876,12 +876,19 @@ const IGNORED_PROXY_KEYS = [
 export interface TypedEnvSchema {}
 export interface PublicTypedEnvSchema {}
 /**
- * With `@generateTsTypes(narrowByEnv=true)`, type generation adds an `env` property here holding the
- * schema split by the current environment, and `ENV` is typed with it. It is still intersected with
- * `TypedEnvSchema` so keys merged in from other generated files stay available.
+ * With `@generateTsTypes(narrowByEnv)`, each generated file adds one property here, keyed by its
+ * schema, holding `{ env: <its schema split by the current environment> }`. `ENV` is typed with all
+ * of them intersected, so in a monorepo every package's env checks narrow, not just one file's. It
+ * is still intersected with `TypedEnvSchema` so keys merged in from other generated files stay
+ * available.
  */
 export interface TypedEnvByEnv {}
-type TypedEnv = TypedEnvByEnv extends { env: infer T } ? T & TypedEnvSchema : TypedEnvSchema;
+type UnionToIntersection<U> = (U extends any ? (x: U) => void : never) extends (x: infer I) => void ? I : never;
+type TypedEnv = keyof TypedEnvByEnv extends never
+  ? TypedEnvSchema
+  : UnionToIntersection<TypedEnvByEnv[keyof TypedEnvByEnv]> extends { env: infer T }
+    ? T & TypedEnvSchema
+    : TypedEnvSchema;
 type DynamicConfigAccessMeta = {
   key: string,
   isPublic: boolean,

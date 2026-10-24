@@ -99,7 +99,7 @@ APP_ENV=test your-test-command
 or you could run a production style build locally `APP_ENV=production varlock run -- your-build-command`
 
 :::tip
-You can also use the [`forEnv()` helper](/reference/functions/#forenv) to dynamically set whether configuration items are required or optional based on the current environment. Set [`narrowByEnv=true`](/reference/root-decorators/#generatetstypes) on `@generateTsTypes` to have checks like `ENV.APP_ENV === 'production'` narrow those items in TypeScript.
+You can also use the [`forEnv()` helper](/reference/functions/#forenv) to dynamically set whether configuration items are required or optional based on the current environment. Generated TypeScript types [narrow those items](/reference/root-decorators/#generatetstypes) after checks like `ENV.APP_ENV === 'production'`.
 :::
 
 ## Setting a _default_ environment flag
